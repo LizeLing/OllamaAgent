@@ -8,9 +8,11 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
+  onEdit?: (id: string, content: string) => void;
+  onRegenerate?: () => void;
 }
 
-export default function MessageList({ messages, isLoading }: MessageListProps) {
+export default function MessageList({ messages, isLoading, onEdit, onRegenerate }: MessageListProps) {
   const { ref } = useAutoScroll<HTMLDivElement>(messages);
 
   if (messages.length === 0) {
@@ -28,8 +30,14 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
   return (
     <div ref={ref} className="flex-1 overflow-y-auto px-4 py-6">
       <div className="max-w-3xl mx-auto">
-        {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+        {messages.map((message, idx) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onEdit={onEdit}
+            onRegenerate={onRegenerate}
+            isLast={idx === messages.length - 1}
+          />
         ))}
         {isLoading && messages[messages.length - 1]?.content === '' && (
           <div className="flex items-center gap-2 text-muted text-sm ml-1 mb-4">

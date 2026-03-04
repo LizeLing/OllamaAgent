@@ -15,6 +15,8 @@ export default function ChatContainer() {
     messages,
     isLoading,
     sendMessage,
+    editMessage,
+    regenerate,
     stopGeneration,
     clearMessages,
     conversationId,
@@ -230,7 +232,7 @@ export default function ChatContainer() {
         </header>
 
         {/* Messages */}
-        <MessageList messages={messages} isLoading={isLoading} />
+        <MessageList messages={messages} isLoading={isLoading} onEdit={editMessage} onRegenerate={regenerate} />
 
         {/* Input */}
         <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} disabled={isLoading} onDrop={handleFileDrop} />
