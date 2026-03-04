@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ConversationMeta } from '@/types/conversation';
+import { FolderMeta } from '@/types/folder';
 
 function formatTimeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -25,6 +26,9 @@ interface ConversationItemProps {
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onTogglePin?: (id: string) => void;
+  onMoveToFolder?: (convId: string, folderId: string | null) => void;
+  folders?: FolderMeta[];
 }
 
 export default function ConversationItem({
@@ -33,10 +37,15 @@ export default function ConversationItem({
   onSelect,
   onDelete,
   onRename,
+  onTogglePin,
+  onMoveToFolder,
+  folders,
 }: ConversationItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(conversation.title);
+  const [showFolderMenu, setShowFolderMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -44,6 +53,17 @@ export default function ConversationItem({
       inputRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (!showFolderMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowFolderMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFolderMenu]);
 
   const handleRename = () => {
     const trimmed = editTitle.trim();
@@ -60,6 +80,15 @@ export default function ConversationItem({
       }`}
       onClick={() => !isEditing && onSelect(conversation.id)}
     >
+      {/* Pin indicator */}
+      {conversation.pinned && (
+        <span className="text-accent text-[10px] shrink-0" title="고정됨">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </span>
+      )}
+
       <div className="flex-1 min-w-0">
         {isEditing ? (
           <input
@@ -77,13 +106,69 @@ export default function ConversationItem({
         ) : (
           <>
             <div className="text-sm truncate">{conversation.title}</div>
-            <div className="text-[10px] text-muted">{formatTimeAgo(conversation.updatedAt)}</div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-muted">{formatTimeAgo(conversation.updatedAt)}</span>
+              {conversation.tags && conversation.tags.length > 0 && (
+                <div className="flex gap-0.5">
+                  {conversation.tags.slice(0, 2).map((tag) => (
+                    <span key={tag} className="text-[9px] bg-accent/10 text-accent px-1 rounded">
+                      {tag}
+                    </span>
+                  ))}
+                  {conversation.tags.length > 2 && (
+                    <span className="text-[9px] text-muted">+{conversation.tags.length - 2}</span>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
 
       {!isEditing && (
-        <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+        <div className="hidden group-hover:flex items-center gap-0.5 shrink-0 relative">
+          {onTogglePin && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePin(conversation.id); }}
+              className={`p-1 rounded transition-colors ${conversation.pinned ? 'text-accent' : 'text-muted hover:text-foreground'}`}
+              title={conversation.pinned ? '고정 해제' : '고정'}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill={conversation.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </button>
+          )}
+          {onMoveToFolder && folders && folders.length > 0 && (
+            <div ref={menuRef}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowFolderMenu(!showFolderMenu); }}
+                className="p-1 text-muted hover:text-foreground rounded transition-colors"
+                title="폴더 이동"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+              </button>
+              {showFolderMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg z-50 py-1 min-w-[120px]">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onMoveToFolder(conversation.id, null); setShowFolderMenu(false); }}
+                    className="w-full px-3 py-1 text-xs text-left text-muted hover:bg-card-hover hover:text-foreground"
+                  >
+                    미분류
+                  </button>
+                  {folders.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={(e) => { e.stopPropagation(); onMoveToFolder(conversation.id, f.id); setShowFolderMenu(false); }}
+                      className="w-full px-3 py-1 text-xs text-left text-muted hover:bg-card-hover hover:text-foreground flex items-center gap-1.5"
+                    >
+                      <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: f.color }} />
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
