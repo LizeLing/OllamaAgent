@@ -32,29 +32,42 @@ export async function* runAgentLoop(
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     yield { type: 'thinking', data: { iteration } };
 
-    // Non-streaming call to check for tool use
+    // Non-streaming call to check for tool use (think: false for speed)
     const response = await chat(config.ollamaUrl, {
       model: config.ollamaModel,
       messages,
       stream: false,
       think: false,
       tools,
-      ...(config.modelOptions ? { options: config.modelOptions } : {}),
+      options: config.modelOptions,
     });
 
     const assistantMsg = response.message;
     const toolCalls = assistantMsg.tool_calls;
 
     if (!toolCalls || toolCalls.length === 0) {
-      // No tool call -> final answer. Stream it for better UX.
-      // We already have the full answer, yield in chunks.
-      const content = assistantMsg.content || '';
+      // No tool call -> final answer. Use chatStream with think: true for thinking tokens.
+      const thinkingStartTime = Date.now();
+      let hasThinking = false;
 
-      if (content) {
-        const chunks = splitIntoChunks(content, 4);
-        for (const chunk of chunks) {
-          yield { type: 'token', data: { content: chunk } };
+      for await (const chunk of chatStream(config.ollamaUrl, {
+        model: config.ollamaModel,
+        messages,
+        think: true,
+        options: config.modelOptions,
+      })) {
+        if (chunk.thinking) {
+          hasThinking = true;
+          yield { type: 'thinking_token', data: { content: chunk.thinking } };
         }
+        if (chunk.message?.content) {
+          yield { type: 'token', data: { content: chunk.message.content } };
+        }
+      }
+
+      if (hasThinking) {
+        const thinkingDuration = Date.now() - thinkingStartTime;
+        yield { type: 'thinking_token', data: { done: true, duration: thinkingDuration } };
       }
 
       yield { type: 'done', data: { iterations: iteration + 1 } };
