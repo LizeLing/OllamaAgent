@@ -57,12 +57,14 @@ export interface OllamaChatStreamChunk {
     content: string;
   };
   done: boolean;
+  thinking?: string;
 }
 
 export interface OllamaGenerateRequest {
   model: string;
   prompt: string;
   stream?: boolean;
+  think?: boolean;
   options?: Record<string, unknown>;
 }
 
