@@ -9,6 +9,7 @@ import ChatInput from './ChatInput';
 import SettingsPanel from '@/components/settings/SettingsPanel';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import Sidebar from '@/components/sidebar/Sidebar';
+import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
 
 export default function ChatContainer() {
   const {
@@ -23,10 +24,13 @@ export default function ChatContainer() {
     setConversationId,
     loadConversation,
     saveToServer,
+    pendingApproval,
+    respondToApproval,
   } = useChat();
   const { settings, updateSettings } = useSettings();
   const {
     conversations,
+    folders,
     activeId,
     setActiveId,
     searchQuery,
@@ -35,6 +39,12 @@ export default function ChatContainer() {
     deleteConversation,
     renameConversation,
     search,
+    togglePin,
+    moveToFolder,
+    updateTags,
+    createFolder,
+    deleteFolder: deleteFolderFn,
+    renameFolder,
   } = useConversations();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -187,6 +197,7 @@ export default function ChatContainer() {
     <div className="flex h-screen bg-background" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <Sidebar
         conversations={conversations}
+        folders={folders}
         activeId={activeId}
         onSelect={handleSelectConversation}
         onNew={handleNewChat}
@@ -198,6 +209,11 @@ export default function ChatContainer() {
         onClose={() => setSidebarOpen(false)}
         onExport={handleExport}
         onImport={handleImport}
+        onTogglePin={togglePin}
+        onMoveToFolder={moveToFolder}
+        onCreateFolder={createFolder}
+        onDeleteFolder={deleteFolderFn}
+        onRenameFolder={renameFolder}
       />
 
       <main className="flex-1 flex flex-col min-w-0">
@@ -264,6 +280,16 @@ export default function ChatContainer() {
         settings={settings}
         onSave={updateSettings}
       />
+
+      {/* Tool Approval Modal */}
+      {pendingApproval && (
+        <ToolApprovalModal
+          toolName={pendingApproval.toolName}
+          toolInput={pendingApproval.toolInput}
+          confirmId={pendingApproval.confirmId}
+          onRespond={respondToApproval}
+        />
+      )}
     </div>
   );
 }
