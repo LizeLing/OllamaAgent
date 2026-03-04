@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Settings } from '@/types/settings';
+import { Settings, ToolApprovalMode } from '@/types/settings';
 import SystemPromptEditor from './SystemPromptEditor';
 import PathConfigEditor from './PathConfigEditor';
+import PresetSelector from './PresetSelector';
+import CustomToolEditor from './CustomToolEditor';
+import McpServerManager from './McpServerManager';
 
 interface Voice {
   name: string;
@@ -82,8 +85,8 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
       <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-background border-l border-border z-50 overflow-y-auto">
-        <div className="p-6">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-md bg-background border-l border-border z-50 overflow-y-auto">
+        <div className="p-6 safe-bottom">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold">Settings</h2>
             <button onClick={onClose} className="text-muted hover:text-foreground text-xl">
@@ -92,6 +95,35 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
           </div>
 
           <div className="space-y-6">
+            <PresetSelector
+              activePresetId={draft.activePresetId}
+              onSelect={(updates) => setDraft({ ...draft, ...updates })}
+            />
+
+            {/* Tool Approval Mode */}
+            <div>
+              <label className="block text-sm font-medium mb-2">도구 승인 모드</label>
+              <div className="space-y-2">
+                {([
+                  { value: 'auto', label: '모든 도구 자동 실행' },
+                  { value: 'confirm', label: '모든 도구 실행 전 확인' },
+                  { value: 'deny-dangerous', label: '위험한 도구만 확인' },
+                ] as { value: ToolApprovalMode; label: string }[]).map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="toolApprovalMode"
+                      value={opt.value}
+                      checked={(draft.toolApprovalMode || 'auto') === opt.value}
+                      onChange={() => setDraft({ ...draft, toolApprovalMode: opt.value })}
+                      className="accent-accent"
+                    />
+                    <span className="text-sm">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <SystemPromptEditor
               value={draft.systemPrompt || ''}
               onChange={(v) => setDraft({ ...draft, systemPrompt: v })}
@@ -209,6 +241,16 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
               label="Denied Paths"
               paths={draft.deniedPaths || []}
               onChange={(paths) => setDraft({ ...draft, deniedPaths: paths })}
+            />
+
+            <CustomToolEditor
+              customTools={draft.customTools || []}
+              onChange={(tools) => setDraft({ ...draft, customTools: tools })}
+            />
+
+            <McpServerManager
+              servers={draft.mcpServers || []}
+              onChange={(servers) => setDraft({ ...draft, mcpServers: servers })}
             />
 
             <button

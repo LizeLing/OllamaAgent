@@ -3,8 +3,9 @@ import { formatSSE } from '@/lib/ollama/streaming';
 import { loadSettings } from '@/lib/config/settings';
 import { ChatRequest } from '@/types/api';
 import { runAgentLoop } from '@/lib/agent/agent-loop';
-import { initializeTools } from '@/lib/tools/init';
+import { initializeTools, registerCustomTools, registerMcpTools } from '@/lib/tools/init';
 import { MemoryManager } from '@/lib/memory/memory-manager';
+import { waitForApproval } from '@/lib/agent/approval';
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
@@ -20,6 +21,14 @@ export async function POST(request: NextRequest) {
       settings.ollamaUrl,
       settings.imageModel
     );
+
+    // Register custom tools and MCP tools
+    if (settings.customTools?.length) {
+      registerCustomTools(settings.customTools);
+    }
+    if (settings.mcpServers?.length) {
+      await registerMcpTools(settings.mcpServers);
+    }
 
     const history = body.history.map((m) => ({
       role: m.role as 'user' | 'assistant',
@@ -47,6 +56,13 @@ export async function POST(request: NextRequest) {
               systemPrompt: settings.systemPrompt,
               allowedPaths: settings.allowedPaths,
               deniedPaths: settings.deniedPaths,
+              toolApprovalMode: settings.toolApprovalMode,
+              onToolApproval: settings.toolApprovalMode !== 'auto'
+                ? (toolName: string) => {
+                    const confirmId = `${Date.now()}-${toolName}`;
+                    return waitForApproval(confirmId);
+                  }
+                : undefined,
             },
             body.message,
             history,

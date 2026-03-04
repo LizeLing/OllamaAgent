@@ -14,6 +14,28 @@
   --warning: #f59e0b;
 }
 
+[data-theme='light'] {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #f5f5f5;
+  --card-hover: #e5e5e5;
+  --border: #e0e0e0;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --muted: #737373;
+  --success: #22c55e;
+  --error: #ef4444;
+  --warning: #f59e0b;
+}
+
+[data-theme='light'] pre code.hljs {
+  background: #f5f5f5 !important;
+}
+
+[data-theme='light'] code:not(pre code) {
+  background: #e5e5e5;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -123,4 +145,18 @@ code:not(pre code) {
 }
 .tool-running {
   animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+/* Safe area for iOS */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Touch-friendly sizes */
+@media (max-width: 768px) {
+  .markdown-body pre code.hljs {
+    font-size: 0.75rem;
+  }
 }

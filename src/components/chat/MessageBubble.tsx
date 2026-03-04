@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Message } from '@/types/message';
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer';
 import ToolCallDisplay from './ToolCallDisplay';
@@ -9,11 +10,16 @@ import { useVoice } from '@/hooks/useVoice';
 
 interface MessageBubbleProps {
   message: Message;
+  onEdit?: (id: string, content: string) => void;
+  onRegenerate?: () => void;
+  isLast?: boolean;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message, onEdit, onRegenerate, isLast }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { isSpeaking, speak, stopSpeaking } = useVoice();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 group`}>
@@ -46,7 +52,26 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         )}
 
         {isUser ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          isEditing ? (
+            <div className="space-y-2">
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setIsEditing(false);
+                }}
+                className="w-full bg-transparent border border-white/20 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-white/40"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-xs text-white/60 hover:text-white">취소</button>
+                <button onClick={() => { onEdit?.(message.id, editContent); setIsEditing(false); }} className="px-3 py-1 text-xs bg-white/20 rounded hover:bg-white/30">저장 및 전송</button>
+              </div>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          )
         ) : (
           <MarkdownRenderer content={message.content} />
         )}
@@ -59,14 +84,34 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           </div>
         )}
 
-        {/* TTS button for assistant messages */}
+        {/* Action buttons for user messages (edit) */}
+        {isUser && !isEditing && (
+          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+            <button onClick={() => { setEditContent(message.content); setIsEditing(true); }} className="p-1 text-white/60 hover:text-white" title="편집">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* TTS + regenerate button for assistant messages */}
         {!isUser && message.content && (
-          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
             <AudioPlayer
               isSpeaking={isSpeaking}
               onSpeak={() => speak(message.content)}
               onStop={stopSpeaking}
             />
+            {isLast && onRegenerate && (
+              <button onClick={onRegenerate} className="p-1 text-muted hover:text-foreground" title="재생성">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+              </button>
+            )}
           </div>
         )}
       </div>

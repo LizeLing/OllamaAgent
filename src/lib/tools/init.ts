@@ -9,6 +9,10 @@ import { HttpClientTool } from './http-client';
 import { WebSearchTool } from './web-search';
 import { CodeExecutorTool } from './code-executor';
 import { ImageGeneratorTool } from './image-generator';
+import { CustomTool } from './custom-tool';
+import { McpTool } from './mcp-tool';
+import { CustomToolDef, McpServerConfig } from '@/types/settings';
+import { listTools } from '@/lib/mcp/client';
 
 let initialized = false;
 
@@ -31,6 +35,26 @@ export function initializeTools(
   toolRegistry.register(new ImageGeneratorTool(ollamaUrl, imageModel));
 
   initialized = true;
+}
+
+export function registerCustomTools(customTools: CustomToolDef[]) {
+  for (const def of customTools) {
+    toolRegistry.register(new CustomTool(def));
+  }
+}
+
+export async function registerMcpTools(mcpServers: McpServerConfig[]) {
+  for (const server of mcpServers) {
+    if (!server.enabled) continue;
+    try {
+      const schemas = await listTools(server.url);
+      for (const schema of schemas) {
+        toolRegistry.register(new McpTool(server.url, schema));
+      }
+    } catch {
+      // MCP server unavailable, skip
+    }
+  }
 }
 
 export function resetTools() {

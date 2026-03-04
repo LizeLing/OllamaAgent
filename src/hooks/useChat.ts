@@ -4,11 +4,44 @@ import { useState, useCallback, useRef } from 'react';
 import { Message, ToolCallInfo, ImageInfo } from '@/types/message';
 import { v4 as uuidv4 } from 'uuid';
 
+interface PendingApproval {
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  confirmId: string;
+}
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const loadConversation = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages || []);
+        setConversationId(id);
+      }
+    } catch {
+      // load failed
+    }
+  }, []);
+
+  const saveToServer = useCallback(async (convId: string, msgs: Message[]) => {
+    try {
+      await fetch(`/api/conversations/${convId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: msgs }),
+      });
+    } catch {
+      // save failed
+    }
+  }, []);
 
   const sendMessage = useCallback(async (content: string, images?: string[]) => {
     setError(null);
@@ -140,6 +173,14 @@ export function useChat() {
               return { ...m, images: [...(m.images || []), img] };
             }
 
+            case 'tool_confirm':
+              setPendingApproval({
+                toolName: data.tool as string,
+                toolInput: data.input as Record<string, unknown>,
+                confirmId: data.confirmId as string,
+              });
+              return m;
+
             case 'error':
               return {
                 ...m,
@@ -155,6 +196,45 @@ export function useChat() {
     []
   );
 
+  const editMessage = useCallback((messageId: string, newContent: string) => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+    const sliced = messages.slice(0, idx).concat({
+      ...messages[idx],
+      content: newContent,
+    });
+    setMessages(sliced);
+    sendMessage(newContent);
+  }, [messages, sendMessage]);
+
+  const regenerate = useCallback(() => {
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx === -1) return;
+    const lastUserMsg = messages[lastUserIdx];
+    const sliced = messages.slice(0, lastUserIdx + 1);
+    setMessages(sliced);
+    sendMessage(lastUserMsg.content, lastUserMsg.attachedImages);
+  }, [messages, sendMessage]);
+
+  const respondToApproval = useCallback(async (confirmId: string, approved: boolean) => {
+    try {
+      await fetch('/api/chat/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmId, approved }),
+      });
+    } catch {
+      // confirm failed
+    }
+    setPendingApproval(null);
+  }, []);
+
   const stopGeneration = useCallback(() => {
     abortRef.current?.abort();
     setIsLoading(false);
@@ -162,6 +242,7 @@ export function useChat() {
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setConversationId(null);
     setError(null);
   }, []);
 
@@ -169,8 +250,17 @@ export function useChat() {
     messages,
     isLoading,
     error,
+    conversationId,
+    setConversationId,
+    setMessages,
     sendMessage,
+    editMessage,
+    regenerate,
     stopGeneration,
     clearMessages,
+    loadConversation,
+    saveToServer,
+    pendingApproval,
+    respondToApproval,
   };
 }

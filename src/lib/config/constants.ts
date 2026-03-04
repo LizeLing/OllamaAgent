@@ -16,4 +16,8 @@ export const DEFAULT_SETTINGS: Settings = {
   searxngUrl: process.env.SEARXNG_URL || 'http://localhost:8888',
   autoReadResponses: false,
   ttsVoice: 'ko-KR-SunHiNeural',
+  toolApprovalMode: 'auto' as const,
+  activePresetId: undefined,
+  customTools: [],
+  mcpServers: [],
 };
