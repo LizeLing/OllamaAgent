@@ -20,4 +20,9 @@ export const DEFAULT_SETTINGS: Settings = {
   activePresetId: undefined,
   customTools: [],
   mcpServers: [],
+  modelOptions: {
+    temperature: 0.7,
+    topP: 0.9,
+    numPredict: 2048,
+  },
 };
