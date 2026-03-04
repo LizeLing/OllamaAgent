@@ -3,7 +3,7 @@ import { formatSSE } from '@/lib/ollama/streaming';
 import { loadSettings } from '@/lib/config/settings';
 import { ChatRequest } from '@/types/api';
 import { runAgentLoop } from '@/lib/agent/agent-loop';
-import { initializeTools } from '@/lib/tools/init';
+import { initializeTools, registerCustomTools, registerMcpTools } from '@/lib/tools/init';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { waitForApproval } from '@/lib/agent/approval';
 
@@ -21,6 +21,14 @@ export async function POST(request: NextRequest) {
       settings.ollamaUrl,
       settings.imageModel
     );
+
+    // Register custom tools and MCP tools
+    if (settings.customTools?.length) {
+      registerCustomTools(settings.customTools);
+    }
+    if (settings.mcpServers?.length) {
+      await registerMcpTools(settings.mcpServers);
+    }
 
     const history = body.history.map((m) => ({
       role: m.role as 'user' | 'assistant',
