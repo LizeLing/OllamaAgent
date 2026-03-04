@@ -60,7 +60,7 @@ export async function* chatStream(
   const res = await fetchWithRetry(`${baseUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...request, stream: true, think: false }),
+    body: JSON.stringify({ ...request, stream: true }),
   });
 
   const reader = res.body?.getReader();
