@@ -6,6 +6,8 @@ export interface Message {
   toolCalls?: ToolCallInfo[];
   images?: ImageInfo[];
   attachedImages?: string[];
+  thinkingContent?: string;
+  thinkingDuration?: number;
 }
 
 export interface ToolCallInfo {
