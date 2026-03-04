@@ -26,7 +26,13 @@ async function writeIndex(index: ConversationMeta[]) {
 
 export async function listConversations(): Promise<ConversationMeta[]> {
   const index = await readIndex();
-  return index.sort((a, b) => b.updatedAt - a.updatedAt);
+  return index.sort((a, b) => {
+    // Pinned first
+    if (a.pinned && !b.pinned) return -1;
+    if (!a.pinned && b.pinned) return 1;
+    // Then by updatedAt
+    return b.updatedAt - a.updatedAt;
+  });
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {
@@ -52,6 +58,9 @@ export async function saveConversation(conv: Conversation): Promise<void> {
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
     messageCount: conv.messages.length,
+    ...(conv.folderId !== undefined && { folderId: conv.folderId }),
+    ...(conv.tags !== undefined && { tags: conv.tags }),
+    ...(conv.pinned !== undefined && { pinned: conv.pinned }),
   };
 
   const existing = index.findIndex((c) => c.id === conv.id);
