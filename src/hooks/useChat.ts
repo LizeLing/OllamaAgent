@@ -141,6 +141,16 @@ export function useChat() {
             case 'token':
               return { ...m, content: m.content + (data.content as string) };
 
+            case 'thinking_token': {
+              if (data.done) {
+                return { ...m, thinkingDuration: data.duration as number };
+              }
+              return {
+                ...m,
+                thinkingContent: (m.thinkingContent || '') + (data.content as string),
+              };
+            }
+
             case 'tool_start': {
               const tc: ToolCallInfo = {
                 id: uuidv4(),
@@ -199,10 +209,8 @@ export function useChat() {
   const editMessage = useCallback((messageId: string, newContent: string) => {
     const idx = messages.findIndex((m) => m.id === messageId);
     if (idx === -1) return;
-    const sliced = messages.slice(0, idx).concat({
-      ...messages[idx],
-      content: newContent,
-    });
+    // Slice before the edited message; sendMessage will add the new user message
+    const sliced = messages.slice(0, idx);
     setMessages(sliced);
     sendMessage(newContent);
   }, [messages, sendMessage]);
@@ -217,7 +225,8 @@ export function useChat() {
     }
     if (lastUserIdx === -1) return;
     const lastUserMsg = messages[lastUserIdx];
-    const sliced = messages.slice(0, lastUserIdx + 1);
+    // Slice before the last user message; sendMessage will re-add it
+    const sliced = messages.slice(0, lastUserIdx);
     setMessages(sliced);
     sendMessage(lastUserMsg.content, lastUserMsg.attachedImages);
   }, [messages, sendMessage]);
