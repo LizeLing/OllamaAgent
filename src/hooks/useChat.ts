@@ -196,6 +196,32 @@ export function useChat() {
     []
   );
 
+  const editMessage = useCallback((messageId: string, newContent: string) => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return;
+    const sliced = messages.slice(0, idx).concat({
+      ...messages[idx],
+      content: newContent,
+    });
+    setMessages(sliced);
+    sendMessage(newContent);
+  }, [messages, sendMessage]);
+
+  const regenerate = useCallback(() => {
+    let lastUserIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx === -1) return;
+    const lastUserMsg = messages[lastUserIdx];
+    const sliced = messages.slice(0, lastUserIdx + 1);
+    setMessages(sliced);
+    sendMessage(lastUserMsg.content, lastUserMsg.attachedImages);
+  }, [messages, sendMessage]);
+
   const respondToApproval = useCallback(async (confirmId: string, approved: boolean) => {
     try {
       await fetch('/api/chat/confirm', {
@@ -228,6 +254,8 @@ export function useChat() {
     setConversationId,
     setMessages,
     sendMessage,
+    editMessage,
+    regenerate,
     stopGeneration,
     clearMessages,
     loadConversation,
