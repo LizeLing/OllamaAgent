@@ -4,6 +4,9 @@ export interface ConversationMeta {
   createdAt: number;
   updatedAt: number;
   messageCount: number;
+  folderId?: string;
+  tags?: string[];
+  pinned?: boolean;
 }
 
 export interface Conversation extends ConversationMeta {
