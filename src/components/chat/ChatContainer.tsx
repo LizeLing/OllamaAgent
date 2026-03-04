@@ -6,6 +6,7 @@ import { useSettings } from '@/hooks/useSettings';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import SettingsPanel from '@/components/settings/SettingsPanel';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 export default function ChatContainer() {
   const { messages, isLoading, sendMessage, stopGeneration, clearMessages } = useChat();
@@ -83,6 +84,7 @@ export default function ChatContainer() {
           >
             New Chat
           </button>
+          <ThemeToggle />
           <button
             onClick={() => setSettingsOpen(true)}
             className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
