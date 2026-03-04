@@ -146,3 +146,17 @@ code:not(pre code) {
 .tool-running {
   animation: pulse-border 1.5s ease-in-out infinite;
 }
+
+/* Safe area for iOS */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Touch-friendly sizes */
+@media (max-width: 768px) {
+  .markdown-body pre code.hljs {
+    font-size: 0.75rem;
+  }
+}

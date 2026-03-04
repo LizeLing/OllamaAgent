@@ -125,7 +125,7 @@ export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) 
 
   return (
     <div
-      className={`border-t border-border bg-background p-4 ${isDragOver ? 'bg-accent/5' : ''}`}
+      className={`border-t border-border bg-background p-4 safe-bottom ${isDragOver ? 'bg-accent/5' : ''}`}
       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}

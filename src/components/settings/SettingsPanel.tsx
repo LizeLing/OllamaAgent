@@ -85,8 +85,8 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
       <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-background border-l border-border z-50 overflow-y-auto">
-        <div className="p-6">
+      <div className="fixed right-0 top-0 h-full w-full md:max-w-md bg-background border-l border-border z-50 overflow-y-auto">
+        <div className="p-6 safe-bottom">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold">Settings</h2>
             <button onClick={onClose} className="text-muted hover:text-foreground text-xl">

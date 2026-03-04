@@ -164,8 +164,27 @@ export default function ChatContainer() {
     fetchConversations();
   }, [fetchConversations]);
 
+  // Touch swipe to open sidebar on mobile
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (touch.clientX < 30) {
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    }
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+    if (dx > 60 && dy < 50) {
+      setSidebarOpen(true);
+    }
+    touchStartRef.current = null;
+  }, []);
+
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <Sidebar
         conversations={conversations}
         activeId={activeId}
