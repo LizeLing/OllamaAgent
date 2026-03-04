@@ -76,9 +76,29 @@ export async function* runAgentLoop(
     });
 
     // Execute each tool call
+    const DANGEROUS_TOOLS = ['code_executor', 'filesystem_write'];
+
     for (const tc of toolCalls) {
       const toolName = tc.function.name;
       const toolArgs = tc.function.arguments;
+
+      // Check tool approval mode
+      if (config.toolApprovalMode && config.toolApprovalMode !== 'auto') {
+        const isDangerous = DANGEROUS_TOOLS.includes(toolName);
+        if (config.toolApprovalMode === 'confirm' ||
+            (config.toolApprovalMode === 'deny-dangerous' && isDangerous)) {
+          const confirmId = `${Date.now()}-${toolName}`;
+          yield { type: 'tool_confirm', data: { tool: toolName, input: toolArgs, confirmId } };
+          if (config.onToolApproval) {
+            const approved = await config.onToolApproval(toolName, toolArgs);
+            if (!approved) {
+              messages.push({ role: 'tool', content: `도구 "${toolName}" 실행이 사용자에 의해 거부되었습니다.` });
+              yield { type: 'tool_end', data: { tool: toolName, output: '사용자가 거부함', success: false } };
+              continue;
+            }
+          }
+        }
+      }
 
       yield { type: 'tool_start', data: { tool: toolName, input: toolArgs } };
 

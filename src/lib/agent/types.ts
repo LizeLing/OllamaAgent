@@ -28,9 +28,11 @@ export interface AgentConfig {
   systemPrompt: string;
   allowedPaths: string[];
   deniedPaths: string[];
+  toolApprovalMode?: 'auto' | 'confirm' | 'deny-dangerous';
+  onToolApproval?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>;
 }
 
 export interface AgentEvent {
-  type: 'thinking' | 'tool_start' | 'tool_end' | 'token' | 'image' | 'done' | 'error';
+  type: 'thinking' | 'tool_start' | 'tool_end' | 'tool_confirm' | 'token' | 'image' | 'done' | 'error';
   data: Record<string, unknown>;
 }
