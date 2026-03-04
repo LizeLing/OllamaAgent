@@ -29,6 +29,12 @@ export interface McpServerConfig {
   enabled: boolean;
 }
 
+export interface ModelOptions {
+  temperature: number;
+  topP: number;
+  numPredict: number;
+}
+
 export interface Settings {
   systemPrompt: string;
   maxIterations: number;
@@ -46,4 +52,5 @@ export interface Settings {
   activePresetId?: string;
   customTools: CustomToolDef[];
   mcpServers: McpServerConfig[];
+  modelOptions: ModelOptions;
 }
