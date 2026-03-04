@@ -7,6 +7,7 @@ import PathConfigEditor from './PathConfigEditor';
 import PresetSelector from './PresetSelector';
 import CustomToolEditor from './CustomToolEditor';
 import McpServerManager from './McpServerManager';
+import ModelOptionsSliders from './ModelOptionsSliders';
 
 interface Voice {
   name: string;
@@ -182,6 +183,11 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
                 />
               )}
             </div>
+
+            <ModelOptionsSliders
+              options={draft.modelOptions || { temperature: 0.7, topP: 0.9, numPredict: 2048 }}
+              onChange={(modelOptions) => setDraft({ ...draft, modelOptions })}
+            />
 
             <div>
               <label className="block text-sm font-medium mb-2">SearXNG URL</label>
