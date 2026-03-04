@@ -8,6 +8,40 @@ import ImageDisplay from './ImageDisplay';
 import AudioPlayer from '@/components/voice/AudioPlayer';
 import { useVoice } from '@/hooks/useVoice';
 
+function ThinkingToggle({ content, duration }: { content: string; duration?: number }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const durationText = duration ? `${(duration / 1000).toFixed(1)}초` : '';
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 text-xs text-muted hover:text-foreground transition-colors"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`transition-transform ${isOpen ? 'rotate-90' : ''}`}
+        >
+          <polyline points="9,18 15,12 9,6" />
+        </svg>
+        <span>Thinking{durationText ? ` (${durationText})` : ''}</span>
+      </button>
+      {isOpen && (
+        <div className="mt-1 pl-4 border-l-2 border-border text-xs text-muted leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
+          {content}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface MessageBubbleProps {
   message: Message;
   onEdit?: (id: string, content: string) => void;
@@ -30,6 +64,13 @@ export default function MessageBubble({ message, onEdit, onRegenerate, isLast }:
             : 'bg-card rounded-2xl rounded-bl-md px-4 py-3'
         }`}
       >
+        {!isUser && message.thinkingContent && (
+          <ThinkingToggle
+            content={message.thinkingContent}
+            duration={message.thinkingDuration}
+          />
+        )}
+
         {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
           <div className="mb-2 space-y-2">
             {message.toolCalls.map((tc) => (
