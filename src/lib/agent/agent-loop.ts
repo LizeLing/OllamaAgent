@@ -39,6 +39,7 @@ export async function* runAgentLoop(
       stream: false,
       think: false,
       tools,
+      ...(config.modelOptions ? { options: config.modelOptions } : {}),
     });
 
     const assistantMsg = response.message;
@@ -90,7 +91,7 @@ export async function* runAgentLoop(
           const confirmId = `${Date.now()}-${toolName}`;
           yield { type: 'tool_confirm', data: { tool: toolName, input: toolArgs, confirmId } };
           if (config.onToolApproval) {
-            const approved = await config.onToolApproval(toolName, toolArgs);
+            const approved = await config.onToolApproval(toolName, toolArgs, confirmId);
             if (!approved) {
               messages.push({ role: 'tool', content: `도구 "${toolName}" 실행이 사용자에 의해 거부되었습니다.` });
               yield { type: 'tool_end', data: { tool: toolName, output: '사용자가 거부함', success: false } };

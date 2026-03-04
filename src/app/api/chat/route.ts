@@ -57,9 +57,13 @@ export async function POST(request: NextRequest) {
               allowedPaths: settings.allowedPaths,
               deniedPaths: settings.deniedPaths,
               toolApprovalMode: settings.toolApprovalMode,
+              modelOptions: settings.modelOptions ? {
+                temperature: settings.modelOptions.temperature,
+                top_p: settings.modelOptions.topP,
+                num_predict: settings.modelOptions.numPredict,
+              } : undefined,
               onToolApproval: settings.toolApprovalMode !== 'auto'
-                ? (toolName: string) => {
-                    const confirmId = `${Date.now()}-${toolName}`;
+                ? (_toolName: string, _args: Record<string, unknown>, confirmId: string) => {
                     return waitForApproval(confirmId);
                   }
                 : undefined,
