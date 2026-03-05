@@ -17,6 +17,29 @@ export class HttpClientTool extends BaseTool {
     const url = args.url as string;
     if (!url) return this.error('url is required');
 
+    // SSRF prevention: block internal/private URLs
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+      const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '169.254.169.254'];
+      if (blockedHosts.includes(hostname) || hostname.endsWith('.local') || hostname.endsWith('.internal')) {
+        return this.error('내부 네트워크 URL에는 접근할 수 없습니다.');
+      }
+      // Block private IP ranges
+      const ipMatch = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+      if (ipMatch) {
+        const [, a, b] = ipMatch.map(Number);
+        if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+          return this.error('사설 IP 대역에는 접근할 수 없습니다.');
+        }
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return this.error('HTTP/HTTPS 프로토콜만 허용됩니다.');
+      }
+    } catch {
+      return this.error('유효하지 않은 URL입니다.');
+    }
+
     const method = ((args.method as string) || 'GET').toUpperCase();
     const body = args.body as string | undefined;
     const headers = (args.headers as Record<string, string>) || {};
