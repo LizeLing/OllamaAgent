@@ -21,9 +21,13 @@ export async function* runAgentLoop(
     userMsg.images = images;
   }
 
+  // Trim history to fit context window (~16K chars ≈ 32K tokens)
+  const maxHistoryChars = 16000;
+  const trimmedHistory = trimHistory(history, maxHistoryChars);
+
   const messages: OllamaChatMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...history.map((m) => ({ role: m.role, content: m.content })),
+    ...trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
     userMsg,
   ];
 
@@ -162,4 +166,22 @@ function splitIntoChunks(text: string, chunkSize: number): string[] {
     chunks.push(text.slice(i, i + chunkSize));
   }
   return chunks;
+}
+
+function trimHistory(
+  history: { role: string; content: string }[],
+  maxChars: number
+): { role: string; content: string }[] {
+  let totalChars = 0;
+  const result: { role: string; content: string }[] = [];
+
+  // Keep most recent messages first
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msgChars = history[i].content.length;
+    if (totalChars + msgChars > maxChars && result.length > 0) break;
+    totalChars += msgChars;
+    result.unshift(history[i]);
+  }
+
+  return result;
 }
