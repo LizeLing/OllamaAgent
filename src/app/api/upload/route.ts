@@ -11,7 +11,7 @@ const ALLOWED_EXTENSIONS = [
   '.txt', '.md', '.json', '.csv', '.log',
   '.ts', '.js', '.py', '.java', '.c', '.cpp', '.h', '.go', '.rs', '.rb', '.php',
   '.html', '.css', '.xml', '.yaml', '.yml', '.toml',
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp',
   '.pdf', '.zip',
 ];
 
