@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Settings } from '@/types/settings';
+import { addToast } from '@/hooks/useToast';
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -14,8 +15,8 @@ export function useSettings() {
         const data = await res.json();
         setSettings(data);
       }
-    } catch {
-      // Use defaults
+    } catch (err) {
+      console.error('[fetchSettings]', err);
     } finally {
       setLoading(false);
     }
@@ -48,8 +49,9 @@ export function useSettings() {
         setSettings(data);
         return true;
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error('[updateSettings]', err);
+      addToast('error', '설정 저장에 실패했습니다.');
     }
     return false;
   }, []);

@@ -10,6 +10,7 @@ async function readFolders(): Promise<FolderMeta[]> {
     const data = await fs.readFile(FOLDERS_FILE, 'utf-8');
     return JSON.parse(data);
   } catch {
+    // Folders file does not exist yet
     return [];
   }
 }

@@ -154,7 +154,7 @@ export default function ChatContainer() {
             fetchConversations();
           }
         } catch {
-          // title generation failed
+          // Title auto-generation failed, non-critical
         }
       }, 2000);
     }
@@ -184,7 +184,8 @@ export default function ChatContainer() {
       prevMessagesLenRef.current = 0;
       fetchConversations();
       addToast('info', '대화가 분기되었습니다.');
-    } catch {
+    } catch (err) {
+      console.error('[handleBranch]', err);
       addToast('error', '대화 분기에 실패했습니다.');
     }
   }, [messages, conversationId, createConversation, setConversationId, setActiveId, loadConversation, fetchConversations]);
@@ -211,7 +212,8 @@ export default function ChatContainer() {
           const err = await res.json().catch(() => ({ error: 'Upload failed' }));
           addToast('error', err.error || '업로드 실패');
         }
-      } catch {
+      } catch (err) {
+        console.error('[handleFileDrop]', err);
         addToast('error', '파일 업로드에 실패했습니다.');
       }
     }
@@ -229,7 +231,8 @@ export default function ChatContainer() {
       a.download = format === 'markdown' ? 'conversation.md' : 'conversation.json';
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.error('[handleExport]', err);
       addToast('error', '내보내기에 실패했습니다.');
     }
   }, []);

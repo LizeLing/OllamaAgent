@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { ConversationMeta } from '@/types/conversation';
 import { FolderMeta } from '@/types/folder';
+import { addToast } from '@/hooks/useToast';
 import ConversationItem from './ConversationItem';
 import FolderGroup from './FolderGroup';
 
@@ -85,8 +86,9 @@ export default function Sidebar({
       if (res.ok) {
         onImport();
       }
-    } catch {
-      // import failed
+    } catch (err) {
+      console.error('[importConversation]', err);
+      addToast('error', '대화 가져오기에 실패했습니다.');
     }
 
     if (fileInputRef.current) {

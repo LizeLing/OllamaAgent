@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ConversationMeta } from '@/types/conversation';
 import { FolderMeta } from '@/types/folder';
+import { addToast } from '@/hooks/useToast';
 
 export interface ConversationWithSnippet extends ConversationMeta {
   matchedSnippet?: string;
@@ -26,8 +27,8 @@ export function useConversations() {
         setConversations(data);
         searchCache.clear(); // Invalidate cache on data change
       }
-    } catch {
-      // fetch failed
+    } catch (err) {
+      console.error('[fetchConversations]', err);
     }
   }, []);
 
@@ -38,8 +39,8 @@ export function useConversations() {
         const data = await res.json();
         setFolders(data);
       }
-    } catch {
-      // fetch failed
+    } catch (err) {
+      console.error('[fetchFolders]', err);
     }
   }, []);
 
@@ -56,8 +57,9 @@ export function useConversations() {
         setActiveId(data.id);
         return data.id;
       }
-    } catch {
-      // create failed
+    } catch (err) {
+      console.error('[createConversation]', err);
+      addToast('error', '대화 생성에 실패했습니다.');
     }
     return null;
   }, [fetchConversations]);
@@ -69,8 +71,9 @@ export function useConversations() {
       if (activeId === id) {
         setActiveId(null);
       }
-    } catch {
-      // delete failed
+    } catch (err) {
+      console.error('[deleteConversation]', err);
+      addToast('error', '대화 삭제에 실패했습니다.');
     }
   }, [activeId, fetchConversations]);
 
@@ -82,8 +85,9 @@ export function useConversations() {
         body: JSON.stringify({ title }),
       });
       await fetchConversations();
-    } catch {
-      // rename failed
+    } catch (err) {
+      console.error('[renameConversation]', err);
+      addToast('error', '이름 변경에 실패했습니다.');
     }
   }, [fetchConversations]);
 
@@ -115,8 +119,8 @@ export function useConversations() {
           if (oldest) searchCache.delete(oldest[0]);
         }
       }
-    } catch {
-      // search failed
+    } catch (err) {
+      console.error('[search]', err);
     }
   }, [fetchConversations]);
 
@@ -130,8 +134,9 @@ export function useConversations() {
         body: JSON.stringify({ pinned: !conv.pinned }),
       });
       await fetchConversations();
-    } catch {
-      // toggle failed
+    } catch (err) {
+      console.error('[togglePin]', err);
+      addToast('error', '고정 변경에 실패했습니다.');
     }
   }, [conversations, fetchConversations]);
 
@@ -143,8 +148,9 @@ export function useConversations() {
         body: JSON.stringify({ folderId: folderId || undefined }),
       });
       await fetchConversations();
-    } catch {
-      // move failed
+    } catch (err) {
+      console.error('[moveToFolder]', err);
+      addToast('error', '폴더 이동에 실패했습니다.');
     }
   }, [fetchConversations]);
 
@@ -156,8 +162,9 @@ export function useConversations() {
         body: JSON.stringify({ tags }),
       });
       await fetchConversations();
-    } catch {
-      // update failed
+    } catch (err) {
+      console.error('[updateTags]', err);
+      addToast('error', '태그 업데이트에 실패했습니다.');
     }
   }, [fetchConversations]);
 
@@ -171,8 +178,9 @@ export function useConversations() {
       if (res.ok) {
         await fetchFolders();
       }
-    } catch {
-      // create failed
+    } catch (err) {
+      console.error('[createFolder]', err);
+      addToast('error', '폴더 생성에 실패했습니다.');
     }
   }, [fetchFolders]);
 
@@ -181,8 +189,9 @@ export function useConversations() {
       await fetch(`/api/folders/${folderId}`, { method: 'DELETE' });
       await fetchFolders();
       await fetchConversations();
-    } catch {
-      // delete failed
+    } catch (err) {
+      console.error('[deleteFolder]', err);
+      addToast('error', '폴더 삭제에 실패했습니다.');
     }
   }, [fetchFolders, fetchConversations]);
 
@@ -194,8 +203,9 @@ export function useConversations() {
         body: JSON.stringify({ name }),
       });
       await fetchFolders();
-    } catch {
-      // rename failed
+    } catch (err) {
+      console.error('[renameFolder]', err);
+      addToast('error', '폴더 이름 변경에 실패했습니다.');
     }
   }, [fetchFolders]);
 

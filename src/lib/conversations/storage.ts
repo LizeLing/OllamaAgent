@@ -23,6 +23,7 @@ export async function readIndex(): Promise<ConversationMeta[]> {
     const data = await fs.readFile(INDEX_FILE, 'utf-8');
     return JSON.parse(data);
   } catch {
+    // Index file does not exist yet, return empty list
     return [];
   }
 }
@@ -50,6 +51,7 @@ export async function getConversation(id: string): Promise<Conversation | null> 
     const data = await fs.readFile(filePath, 'utf-8');
     return JSON.parse(data);
   } catch {
+    // Conversation file not found or invalid
     return null;
   }
 }
@@ -89,7 +91,7 @@ export async function deleteConversation(id: string): Promise<void> {
     const filePath = path.join(CONVERSATIONS_DIR, `${id}.json`);
     await fs.unlink(filePath);
   } catch {
-    // file may not exist
+    // File already deleted or does not exist
   }
 
   const index = await readIndex();
@@ -112,8 +114,8 @@ export async function clearFolderFromConversations(folderId: string): Promise<vo
         const conv = JSON.parse(data);
         delete conv.folderId;
         await fs.writeFile(filePath, JSON.stringify(conv, null, 2));
-      } catch {
-        // conversation file may not exist
+      } catch (err) {
+        console.error(`[clearFolder] Failed to update conversation ${meta.id}:`, err);
       }
     }
   }
@@ -160,8 +162,8 @@ export async function searchConversations(query: string): Promise<SearchResult[]
           break;
         }
       }
-    } catch {
-      // skip unreadable conversations
+    } catch (err) {
+      console.error(`[searchConversations] Failed to read conversation ${meta.id}:`, err);
     }
   }
 

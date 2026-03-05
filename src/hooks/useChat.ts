@@ -27,8 +27,8 @@ export function useChat() {
         setMessages(data.messages || []);
         setConversationId(id);
       }
-    } catch {
-      // load failed
+    } catch (err) {
+      console.error('[loadConversation]', err);
     }
   }, []);
 
@@ -39,8 +39,8 @@ export function useChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: msgs }),
       });
-    } catch {
-      // save failed
+    } catch (err) {
+      console.error('[saveToServer]', err);
     }
   }, []);
 
@@ -210,7 +210,7 @@ export function useChat() {
               const data = JSON.parse(dataStr);
               handleSSEEvent(assistantId, eventType, data);
             } catch {
-              // skip malformed JSON
+              // Partial SSE data, skip malformed JSON
             }
           }
         }
@@ -273,8 +273,9 @@ export function useChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirmId, approved }),
       });
-    } catch {
-      // confirm failed
+    } catch (err) {
+      console.error('[respondToApproval]', err);
+      addToast('error', '승인 응답에 실패했습니다.');
     }
     setPendingApproval(null);
   }, []);

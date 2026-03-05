@@ -26,8 +26,8 @@ export default function StatsPanel({ isOpen, onClose }: StatsPanelProps) {
       const r = await fetch('/api/stats');
       const data = await r.json();
       setStats(data);
-    } catch {
-      // stats fetch failed
+    } catch (err) {
+      console.error('[fetchStats]', err);
     } finally {
       setLoading(false);
     }

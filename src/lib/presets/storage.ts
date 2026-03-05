@@ -29,11 +29,12 @@ async function loadCustomPresets(): Promise<AgentPreset[]> {
         const data = await fs.readFile(path.join(PRESETS_DIR, file), 'utf-8');
         presets.push(JSON.parse(data));
       } catch {
-        // skip invalid files
+        // Skip invalid preset file
       }
     }
     return presets;
   } catch {
+    // Presets directory does not exist yet
     return [];
   }
 }
@@ -52,6 +53,7 @@ export async function getPreset(id: string): Promise<AgentPreset | null> {
     const data = await fs.readFile(path.join(PRESETS_DIR, `${id}.json`), 'utf-8');
     return JSON.parse(data);
   } catch {
+    // Preset file not found
     return null;
   }
 }
@@ -71,6 +73,7 @@ export async function deletePreset(id: string): Promise<boolean> {
     await fs.unlink(path.join(PRESETS_DIR, `${id}.json`));
     return true;
   } catch {
+    // Preset file not found
     return false;
   }
 }

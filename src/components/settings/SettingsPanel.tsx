@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Settings, ToolApprovalMode } from '@/types/settings';
+import { addToast } from '@/hooks/useToast';
 import SystemPromptEditor from './SystemPromptEditor';
 import PathConfigEditor from './PathConfigEditor';
 import PresetSelector from './PresetSelector';
@@ -397,7 +398,10 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
                         const keysData = await keysRes.json();
                         setWebhookKeys(Array.isArray(keysData) ? keysData : []);
                       }
-                    } catch { /* */ }
+                    } catch (err) {
+                      console.error('[createWebhookKey]', err);
+                      addToast('error', 'API 키 생성에 실패했습니다.');
+                    }
                   }}
                   disabled={webhookKeys.length >= 10}
                   className="px-3 py-1.5 text-sm bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-40 shrink-0"
@@ -422,8 +426,9 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
                     a.download = 'ollamaagent-settings.json';
                     a.click();
                     URL.revokeObjectURL(url);
-                  } catch {
-                    // export failed
+                  } catch (err) {
+                    console.error('[exportSettings]', err);
+                    addToast('error', '설정 내보내기에 실패했습니다.');
                   }
                 }}
                 className="flex-1 py-2 text-sm text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
@@ -451,8 +456,9 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
                         const result = await res.json();
                         setDraft({ ...result.settings });
                       }
-                    } catch {
-                      // import failed
+                    } catch (err) {
+                      console.error('[importSettings]', err);
+                      addToast('error', '설정 가져오기에 실패했습니다.');
                     }
                     e.target.value = '';
                   }}

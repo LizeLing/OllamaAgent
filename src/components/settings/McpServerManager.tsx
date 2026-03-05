@@ -54,7 +54,8 @@ export default function McpServerManager({ servers, onChange }: McpServerManager
       });
       const data = await res.json();
       setTestResult((prev) => ({ ...prev, [server.id]: data.connected }));
-    } catch {
+    } catch (err) {
+      console.error('[testMcpServer]', err);
       setTestResult((prev) => ({ ...prev, [server.id]: false }));
     }
     setTesting(null);
