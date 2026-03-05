@@ -8,6 +8,7 @@ export interface Message {
   attachedImages?: string[];
   thinkingContent?: string;
   thinkingDuration?: number;
+  error?: string;
 }
 
 export interface ToolCallInfo {
