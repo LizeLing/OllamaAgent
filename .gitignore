@@ -42,6 +42,9 @@ yarn-error.log*
 /data/generated/
 /data/settings.json
 
+# worktrees
+.worktrees/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
