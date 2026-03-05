@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error('[CHAT_ERROR]', error instanceof Error ? error.message : error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
     const errorStream = new ReadableStream({
       start(controller) {
