@@ -6,6 +6,14 @@ import path from 'path';
 const CONVERSATIONS_DIR = path.join(DATA_DIR, 'conversations');
 const INDEX_FILE = path.join(CONVERSATIONS_DIR, 'index.json');
 
+const ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+function validateId(id: string): void {
+  if (!id || !ID_PATTERN.test(id)) {
+    throw new Error(`Invalid ID: ${id}`);
+  }
+}
+
 async function ensureDir() {
   await fs.mkdir(CONVERSATIONS_DIR, { recursive: true });
 }
@@ -37,6 +45,7 @@ export async function listConversations(): Promise<ConversationMeta[]> {
 
 export async function getConversation(id: string): Promise<Conversation | null> {
   try {
+    validateId(id);
     const filePath = path.join(CONVERSATIONS_DIR, `${id}.json`);
     const data = await fs.readFile(filePath, 'utf-8');
     return JSON.parse(data);
@@ -47,6 +56,7 @@ export async function getConversation(id: string): Promise<Conversation | null> 
 
 export async function saveConversation(conv: Conversation): Promise<void> {
   await ensureDir();
+  validateId(conv.id);
 
   const filePath = path.join(CONVERSATIONS_DIR, `${conv.id}.json`);
   await fs.writeFile(filePath, JSON.stringify(conv, null, 2));
@@ -75,6 +85,7 @@ export async function saveConversation(conv: Conversation): Promise<void> {
 
 export async function deleteConversation(id: string): Promise<void> {
   try {
+    validateId(id);
     const filePath = path.join(CONVERSATIONS_DIR, `${id}.json`);
     await fs.unlink(filePath);
   } catch {
