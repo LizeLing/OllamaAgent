@@ -64,6 +64,13 @@ export function registerCustomTools(customTools: CustomToolDef[]) {
   }
 }
 
+import { DelegateToSubAgentTool } from '@/lib/agent/subagent-tool';
+import { AgentConfig } from '@/lib/agent/types';
+
+export function registerSubAgentTool(config: AgentConfig): void {
+  toolRegistry.register(new DelegateToSubAgentTool(config));
+}
+
 export async function registerMcpTools(mcpServers: McpServerConfig[]) {
   for (const server of mcpServers) {
     if (!server.enabled) continue;

@@ -173,6 +173,14 @@ export async function* runAgentLoop(
 
       const result = await toolRegistry.execute(toolName, toolArgs);
 
+      // Drain subagent events if tool supports it
+      const executedTool = toolRegistry.get(toolName);
+      if (executedTool && 'drainEvents' in executedTool) {
+        for (const evt of (executedTool as { drainEvents(): AgentEvent[] }).drainEvents()) {
+          yield evt;
+        }
+      }
+
       // Check if result contains image data
       let observation = result.output;
       if (result.success && result.output.startsWith('__IMAGE__')) {
