@@ -7,6 +7,7 @@ export interface ConversationMeta {
   folderId?: string;
   tags?: string[];
   pinned?: boolean;
+  branchedFrom?: { conversationId: string; messageIndex: number };
 }
 
 export interface Conversation extends ConversationMeta {
