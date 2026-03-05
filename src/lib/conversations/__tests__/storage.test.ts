@@ -17,14 +17,11 @@ vi.mock('@/lib/config/constants', () => ({
 describe('storage ID validation', () => {
   let getConversation: typeof import('../storage').getConversation;
   let deleteConversation: typeof import('../storage').deleteConversation;
-  let saveConversation: typeof import('../storage').saveConversation;
-
   beforeEach(async () => {
     vi.resetModules();
     const mod = await import('../storage');
     getConversation = mod.getConversation;
     deleteConversation = mod.deleteConversation;
-    saveConversation = mod.saveConversation;
   });
 
   it('rejects path traversal in getConversation', async () => {

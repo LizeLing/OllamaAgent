@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ConversationMeta } from '@/types/conversation';
 import { FolderMeta } from '@/types/folder';
 
@@ -199,10 +199,14 @@ export function useConversations() {
     }
   }, [fetchFolders]);
 
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     fetchConversations();
     fetchFolders();
-  }, [fetchConversations, fetchFolders]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     conversations,

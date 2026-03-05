@@ -4,7 +4,7 @@ import { Message } from '@/types/message';
 import MessageBubble from './MessageBubble';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 interface MessageListProps {
   messages: Message[];
@@ -43,20 +43,31 @@ const RENDER_BUFFER = 20;
 
 export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend, onBranch }: MessageListProps) {
   const { ref } = useAutoScroll<HTMLDivElement>(messages);
-  const [visibleRange, setVisibleRange] = useState({ start: 0, end: messages.length });
   const useVirtual = messages.length >= VIRTUAL_THRESHOLD;
   const sentinelTopRef = useRef<HTMLDivElement>(null);
+  const [loadedStart, setLoadedStart] = useState<number | null>(null);
+  const [prevLength, setPrevLength] = useState(messages.length);
 
-  useEffect(() => {
-    if (!useVirtual) {
-      setVisibleRange({ start: 0, end: messages.length });
-      return;
+  if (messages.length !== prevLength) {
+    setPrevLength(messages.length);
+    if (loadedStart !== null) {
+      setLoadedStart(null);
     }
-    setVisibleRange({
+  }
+
+  const initialRange = useMemo(() => {
+    if (!useVirtual) {
+      return { start: 0, end: messages.length };
+    }
+    return {
       start: Math.max(0, messages.length - RENDER_BUFFER * 2),
       end: messages.length,
-    });
+    };
   }, [messages.length, useVirtual]);
+
+  const visibleRange = loadedStart !== null && useVirtual
+    ? { start: loadedStart, end: messages.length }
+    : initialRange;
 
   useEffect(() => {
     if (!useVirtual || !sentinelTopRef.current) return;
@@ -64,10 +75,7 @@ export default function MessageList({ messages, isLoading, onEdit, onRegenerate,
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && visibleRange.start > 0) {
-          setVisibleRange((prev) => ({
-            start: Math.max(0, prev.start - RENDER_BUFFER),
-            end: prev.end,
-          }));
+          setLoadedStart(Math.max(0, visibleRange.start - RENDER_BUFFER));
         }
       },
       { threshold: 0.1 }

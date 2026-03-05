@@ -1,4 +1,3 @@
-import { OllamaChatStreamChunk } from './types';
 import { chatStream } from './client';
 
 export function createSSEStream(

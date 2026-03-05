@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export type ToastType = 'error' | 'warning' | 'info';
 
@@ -10,14 +10,15 @@ export interface Toast {
   message: string;
 }
 
-type Listener = (toasts: Toast[]) => void;
+type Listener = () => void;
 
 let toastList: Toast[] = [];
+let snapshot: Toast[] = [];
 const listeners = new Set<Listener>();
 
 function notify() {
-  const snapshot = [...toastList];
-  listeners.forEach((l) => l(snapshot));
+  snapshot = [...toastList];
+  listeners.forEach((l) => l());
 }
 
 export function addToast(type: ToastType, message: string) {
@@ -32,16 +33,20 @@ export function removeToast(id: string) {
   notify();
 }
 
+function subscribe(callback: Listener) {
+  listeners.add(callback);
+  return () => { listeners.delete(callback); };
+}
+
+function getSnapshot() {
+  return snapshot;
+}
+
+function getServerSnapshot() {
+  return [];
+}
+
 export function useToast() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-
-  useEffect(() => {
-    listeners.add(setToasts);
-    setToasts([...toastList]);
-    return () => {
-      listeners.delete(setToasts);
-    };
-  }, []);
-
+  const toasts = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return { toasts, addToast, removeToast };
 }

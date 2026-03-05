@@ -51,7 +51,12 @@ export default function ChatContainer() {
     renameFolder,
   } = useConversations();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(min-width: 768px)').matches;
+    }
+    return false;
+  });
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [toolLogOpen, setToolLogOpen] = useState(false);
@@ -60,12 +65,6 @@ export default function ChatContainer() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const prevMessagesLenRef = useRef(0);
   const dragCounterRef = useRef(0);
-
-  // Detect desktop on mount
-  useEffect(() => {
-    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
-    setSidebarOpen(isDesktop);
-  }, []);
 
   // Save messages to server after assistant response completes
   useEffect(() => {

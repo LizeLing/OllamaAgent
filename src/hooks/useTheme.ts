@@ -4,16 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 
 type Theme = 'dark' | 'light' | 'system';
 
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  const saved = localStorage.getItem('theme') as Theme | null;
+  return saved || 'dark';
+}
+
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>('dark');
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
-    const saved = localStorage.getItem('theme') as Theme | null;
-    if (saved) {
-      setThemeState(saved);
-      applyTheme(saved);
-    }
-  }, []);
+    applyTheme(theme);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Stats {
   totalConversations: number;
@@ -20,15 +20,23 @@ export default function StatsPanel({ isOpen, onClose }: StatsPanelProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const fetchStats = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/stats');
+      const data = await r.json();
+      setStats(data);
+    } catch {
+      // stats fetch failed
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
-    fetch('/api/stats')
-      .then((r) => r.json())
-      .then((data) => setStats(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [isOpen]);
+    fetchStats();
+  }, [isOpen, fetchStats]);
 
   if (!isOpen) return null;
 
