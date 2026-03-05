@@ -44,6 +44,92 @@ export function useChat() {
     }
   }, []);
 
+  const handleSSEEvent = useCallback(
+    (assistantId: string, event: string, data: Record<string, unknown>) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m;
+
+          switch (event) {
+            case 'token':
+              return { ...m, content: m.content + (data.content as string) };
+
+            case 'thinking_token': {
+              if (data.done) {
+                return { ...m, thinkingDuration: data.duration as number };
+              }
+              return {
+                ...m,
+                thinkingContent: (m.thinkingContent || '') + (data.content as string),
+              };
+            }
+
+            case 'tool_start': {
+              const tc: ToolCallInfo = {
+                id: uuidv4(),
+                tool: data.tool as string,
+                input: data.input as Record<string, unknown>,
+                startTime: Date.now(),
+              };
+              return { ...m, toolCalls: [...(m.toolCalls || []), tc] };
+            }
+
+            case 'tool_end': {
+              const toolCalls = (m.toolCalls || []).map((tc) =>
+                tc.tool === data.tool && tc.endTime === undefined
+                  ? {
+                      ...tc,
+                      output: data.output as string,
+                      success: data.success as boolean,
+                      endTime: Date.now(),
+                    }
+                  : tc
+              );
+              return { ...m, toolCalls };
+            }
+
+            case 'image': {
+              const img: ImageInfo = {
+                base64: data.base64 as string,
+                prompt: data.prompt as string,
+              };
+              return { ...m, images: [...(m.images || []), img] };
+            }
+
+            case 'tool_confirm':
+              setPendingApproval({
+                toolName: data.tool as string,
+                toolInput: data.input as Record<string, unknown>,
+                confirmId: data.confirmId as string,
+              });
+              return m;
+
+            case 'done': {
+              const updates: Partial<Message> = {};
+              if (data.tokenUsage) {
+                updates.tokenUsage = data.tokenUsage as unknown as TokenUsage;
+              }
+              if (data.model) {
+                updates.model = data.model as string;
+              }
+              return Object.keys(updates).length > 0 ? { ...m, ...updates } : m;
+            }
+
+            case 'error':
+              return {
+                ...m,
+                error: data.message as string,
+              };
+
+            default:
+              return m;
+          }
+        })
+      );
+    },
+    []
+  );
+
   const sendMessage = useCallback(async (content: string, images?: string[], model?: string) => {
     setError(null);
 
@@ -145,93 +231,7 @@ export function useChat() {
       setIsLoading(false);
       abortRef.current = null;
     }
-  }, [messages]);
-
-  const handleSSEEvent = useCallback(
-    (assistantId: string, event: string, data: Record<string, unknown>) => {
-      setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id !== assistantId) return m;
-
-          switch (event) {
-            case 'token':
-              return { ...m, content: m.content + (data.content as string) };
-
-            case 'thinking_token': {
-              if (data.done) {
-                return { ...m, thinkingDuration: data.duration as number };
-              }
-              return {
-                ...m,
-                thinkingContent: (m.thinkingContent || '') + (data.content as string),
-              };
-            }
-
-            case 'tool_start': {
-              const tc: ToolCallInfo = {
-                id: uuidv4(),
-                tool: data.tool as string,
-                input: data.input as Record<string, unknown>,
-                startTime: Date.now(),
-              };
-              return { ...m, toolCalls: [...(m.toolCalls || []), tc] };
-            }
-
-            case 'tool_end': {
-              const toolCalls = (m.toolCalls || []).map((tc) =>
-                tc.tool === data.tool && tc.endTime === undefined
-                  ? {
-                      ...tc,
-                      output: data.output as string,
-                      success: data.success as boolean,
-                      endTime: Date.now(),
-                    }
-                  : tc
-              );
-              return { ...m, toolCalls };
-            }
-
-            case 'image': {
-              const img: ImageInfo = {
-                base64: data.base64 as string,
-                prompt: data.prompt as string,
-              };
-              return { ...m, images: [...(m.images || []), img] };
-            }
-
-            case 'tool_confirm':
-              setPendingApproval({
-                toolName: data.tool as string,
-                toolInput: data.input as Record<string, unknown>,
-                confirmId: data.confirmId as string,
-              });
-              return m;
-
-            case 'done': {
-              const updates: Partial<Message> = {};
-              if (data.tokenUsage) {
-                updates.tokenUsage = data.tokenUsage as unknown as TokenUsage;
-              }
-              if (data.model) {
-                updates.model = data.model as string;
-              }
-              return Object.keys(updates).length > 0 ? { ...m, ...updates } : m;
-            }
-
-            case 'error':
-              return {
-                ...m,
-                error: data.message as string,
-              };
-
-            default:
-              return m;
-          }
-        })
-      );
-    },
-    []
-  );
+  }, [messages, handleSSEEvent]);
 
   const editMessage = useCallback((messageId: string, newContent: string) => {
     const idx = messages.findIndex((m) => m.id === messageId);

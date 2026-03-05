@@ -155,7 +155,7 @@ export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) 
     if (imageFiles.length > 0) {
       processImageFiles(imageFiles);
     }
-  }, []);
+  }, [processImageFiles]);
 
   return (
     <div
