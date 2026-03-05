@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { useState } from 'react';
+import CodeActions from './CodeActions';
 
 interface MarkdownRendererProps {
   content: string;
@@ -91,6 +92,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
                     <CopyButton code={codeText} />
                   </div>
                 )}
+                {lang && codeText && <CodeActions language={lang} code={codeText} />}
               </div>
             );
           },
