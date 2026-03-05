@@ -35,8 +35,15 @@ class ToolRegistry {
   }
 
   /** Convert tool definitions to Ollama native tool format */
-  toOllamaTools(): OllamaTool[] {
-    return Array.from(this.tools.values()).map((tool) => {
+  toOllamaTools(enabledTools?: string[]): OllamaTool[] {
+    let tools = Array.from(this.tools.values());
+
+    // enabledTools가 비어있지 않으면 필터링
+    if (enabledTools && enabledTools.length > 0) {
+      tools = tools.filter((t) => enabledTools.includes(t.definition.name));
+    }
+
+    return tools.map((tool) => {
       const def = tool.definition;
       const properties: Record<string, { type: string; description: string }> = {};
       const required: string[] = [];
