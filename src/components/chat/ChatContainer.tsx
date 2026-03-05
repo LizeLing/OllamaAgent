@@ -214,6 +214,7 @@ export default function ChatContainer() {
         onCreateFolder={createFolder}
         onDeleteFolder={deleteFolderFn}
         onRenameFolder={renameFolder}
+        onUpdateTags={updateTags}
       />
 
       <main className="flex-1 flex flex-col min-w-0">
