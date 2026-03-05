@@ -166,3 +166,28 @@ code:not(pre code) {
     font-size: 0.75rem;
   }
 }
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .markdown-body h1 { font-size: 1.25rem; }
+  .markdown-body h2 { font-size: 1.1rem; }
+  .markdown-body h3 { font-size: 1rem; }
+  .markdown-body p { font-size: 0.875rem; }
+  .markdown-body ul, .markdown-body ol { margin-left: 1rem; }
+  .markdown-body table { font-size: 0.75rem; }
+  .markdown-body th, .markdown-body td { padding: 0.375rem 0.5rem; }
+}
+
+/* Prevent zoom on input focus (iOS) */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Keyboard visible height adjustment */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+}

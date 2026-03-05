@@ -4,6 +4,7 @@ import { Message } from '@/types/message';
 import MessageBubble from './MessageBubble';
 import { useAutoScroll } from '@/hooks/useAutoScroll';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { useState, useEffect, useRef } from 'react';
 
 interface MessageListProps {
   messages: Message[];
@@ -37,8 +38,44 @@ const SUGGESTIONS = [
   },
 ];
 
+const VIRTUAL_THRESHOLD = 100;
+const RENDER_BUFFER = 20;
+
 export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend, onBranch }: MessageListProps) {
   const { ref } = useAutoScroll<HTMLDivElement>(messages);
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: messages.length });
+  const useVirtual = messages.length >= VIRTUAL_THRESHOLD;
+  const sentinelTopRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!useVirtual) {
+      setVisibleRange({ start: 0, end: messages.length });
+      return;
+    }
+    setVisibleRange({
+      start: Math.max(0, messages.length - RENDER_BUFFER * 2),
+      end: messages.length,
+    });
+  }, [messages.length, useVirtual]);
+
+  useEffect(() => {
+    if (!useVirtual || !sentinelTopRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleRange.start > 0) {
+          setVisibleRange((prev) => ({
+            start: Math.max(0, prev.start - RENDER_BUFFER),
+            end: prev.end,
+          }));
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinelTopRef.current);
+    return () => observer.disconnect();
+  }, [useVirtual, visibleRange.start]);
 
   if (messages.length === 0) {
     return (
@@ -65,20 +102,33 @@ export default function MessageList({ messages, isLoading, onEdit, onRegenerate,
     );
   }
 
+  const visibleMessages = useVirtual
+    ? messages.slice(visibleRange.start, visibleRange.end)
+    : messages;
+
   return (
     <div ref={ref} className="flex-1 overflow-y-auto px-4 py-6">
       <div className="max-w-3xl mx-auto">
-        {messages.map((message, idx) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            onEdit={onEdit}
-            onRegenerate={onRegenerate}
-            onRetry={onRegenerate}
-            onBranch={onBranch}
-            isLast={idx === messages.length - 1}
-          />
-        ))}
+        {useVirtual && visibleRange.start > 0 && (
+          <div ref={sentinelTopRef} className="h-4 flex items-center justify-center">
+            <span className="text-[10px] text-muted">이전 메시지 {visibleRange.start}개 ...</span>
+          </div>
+        )}
+
+        {visibleMessages.map((message, idx) => {
+          const globalIdx = useVirtual ? visibleRange.start + idx : idx;
+          return (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              onEdit={onEdit}
+              onRegenerate={onRegenerate}
+              onRetry={onRegenerate}
+              onBranch={onBranch}
+              isLast={globalIdx === messages.length - 1}
+            />
+          );
+        })}
         {isLoading && messages[messages.length - 1]?.content === '' && (
           <div className="flex items-center gap-2 text-muted text-sm ml-1 mb-4">
             <LoadingSpinner size={16} />
