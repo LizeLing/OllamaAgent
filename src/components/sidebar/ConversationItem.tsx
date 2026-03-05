@@ -48,6 +48,7 @@ export default function ConversationItem({
   const [showFolderMenu, setShowFolderMenu] = useState(false);
   const [showTagEditor, setShowTagEditor] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -203,15 +204,25 @@ export default function ConversationItem({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(conversation.id);
+              if (confirmDelete) {
+                onDelete(conversation.id);
+                setConfirmDelete(false);
+              } else {
+                setConfirmDelete(true);
+                setTimeout(() => setConfirmDelete(false), 3000);
+              }
             }}
-            className="p-1 text-muted hover:text-error rounded transition-colors"
-            title="삭제"
+            className={`p-1 rounded transition-colors ${confirmDelete ? 'text-error bg-error/10' : 'text-muted hover:text-error'}`}
+            title={confirmDelete ? '삭제 확인' : '삭제'}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3,6 5,6 21,6" />
-              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-            </svg>
+            {confirmDelete ? (
+              <span className="text-[10px] font-medium px-0.5">삭제?</span>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3,6 5,6 21,6" />
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg>
+            )}
           </button>
         </div>
       )}
