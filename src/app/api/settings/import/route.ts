@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await saveSettings(merged as Settings);
+    await saveSettings(merged as unknown as Settings);
     const updated = await loadSettings();
 
     return NextResponse.json({ success: true, settings: updated });
