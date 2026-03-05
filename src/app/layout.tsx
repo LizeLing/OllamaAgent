@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import 'highlight.js/styles/github-dark.css';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
+import ToastContainer from '@/components/ui/ToastContainer';
 
 const inter = Inter({
   variable: "--font-inter",
@@ -51,7 +53,10 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-[family-name:var(--font-inter)] antialiased`}
       >
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
+        <ToastContainer />
       </body>
     </html>
   );
