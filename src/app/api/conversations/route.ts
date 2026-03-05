@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listConversations, saveConversation } from '@/lib/conversations/storage';
 import { Conversation } from '@/types/conversation';
 import { v4 as uuidv4 } from 'uuid';
+import { HookExecutor } from '@/lib/hooks/executor';
 
 export async function GET() {
   try {
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
     };
 
     await saveConversation(conv);
+    HookExecutor.fireAndForget('on_conversation_created', { conversationId: conv.id, title: conv.title });
     return NextResponse.json(conv, { status: 201 });
   } catch (error) {
     console.error('[CONVERSATIONS_CREATE_ERROR]', error instanceof Error ? error.message : error);

@@ -34,4 +34,10 @@ export const COMMANDS: CommandDefinition[] = [
     args: [{ name: 'prompt', description: '새 시스템 프롬프트', required: true }],
     type: 'server',
   },
+  {
+    name: 'skill',
+    description: '스킬 실행 (목록 표시 또는 실행)',
+    args: [{ name: 'name', description: '스킬 트리거 커맨드', required: false }],
+    type: 'client',
+  },
 ];

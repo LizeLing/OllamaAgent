@@ -6,6 +6,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import { hashKey } from '@/lib/webhooks/auth';
 import { findKeyByHash, updateLastUsed } from '@/lib/webhooks/storage';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/middleware/rate-limiter';
+import { HookExecutor } from '@/lib/hooks/executor';
 
 export async function POST(request: NextRequest) {
   const clientIP = request.headers.get('x-forwarded-for') || 'unknown';
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
     memories = await mm.searchMemories(message, 3);
   } catch { /* continue without */ }
 
+  HookExecutor.fireAndForget('on_message_received', { message, source: 'webhook' });
+
   // 에이전트 실행
   try {
     const agentLoop = runAgentLoop(
@@ -119,6 +122,8 @@ export async function POST(request: NextRequest) {
         usedModel = (event.data.model as string) || model;
       }
     }
+
+    HookExecutor.fireAndForget('on_response_complete', { response: fullResponse, source: 'webhook' });
 
     const result = {
       success: true,

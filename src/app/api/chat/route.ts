@@ -3,10 +3,13 @@ import { formatSSE } from '@/lib/ollama/streaming';
 import { loadSettings } from '@/lib/config/settings';
 import { ChatRequest } from '@/types/api';
 import { runAgentLoop } from '@/lib/agent/agent-loop';
-import { initializeTools, registerCustomTools, registerMcpTools } from '@/lib/tools/init';
+import { getSkill } from '@/lib/skills/storage';
+import { runSkill } from '@/lib/skills/skill-runner';
+import { initializeTools, registerCustomTools, registerMcpTools, registerSubAgentTool } from '@/lib/tools/init';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { waitForApproval } from '@/lib/agent/approval';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/middleware/rate-limiter';
+import { HookExecutor } from '@/lib/hooks/executor';
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
@@ -50,6 +53,19 @@ export async function POST(request: NextRequest) {
       await registerMcpTools(settings.mcpServers);
     }
 
+    // Register subagent tool
+    registerSubAgentTool({
+      ollamaUrl: settings.ollamaUrl,
+      ollamaModel: requestModel || settings.ollamaModel,
+      maxIterations: settings.maxIterations,
+      systemPrompt: settings.systemPrompt,
+      allowedPaths: settings.allowedPaths,
+      deniedPaths: settings.deniedPaths,
+      fallbackModels: settings.fallbackModels || [],
+      nestingDepth: 0,
+      maxNestingDepth: 2,
+    });
+
     const history = body.history.map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
@@ -64,19 +80,20 @@ export async function POST(request: NextRequest) {
       // RAG unavailable, continue without memories
     }
 
+    HookExecutor.fireAndForget('on_message_received', { message: body.message, model: requestModel });
+
     const stream = new ReadableStream({
       async start(controller) {
         let fullResponse = '';
         try {
-          const agentLoop = runAgentLoop(
-            {
+          const agentConfig = {
               ollamaUrl: settings.ollamaUrl,
               ollamaModel: requestModel || settings.ollamaModel,
               maxIterations: settings.maxIterations,
               systemPrompt: settings.systemPrompt,
               allowedPaths: settings.allowedPaths,
               deniedPaths: settings.deniedPaths,
-              toolApprovalMode: settings.toolApprovalMode,
+              toolApprovalMode: settings.toolApprovalMode as 'auto' | 'confirm' | 'deny-dangerous' | undefined,
               modelOptions: settings.modelOptions ? {
                 temperature: settings.modelOptions.temperature,
                 top_p: settings.modelOptions.topP,
@@ -89,16 +106,25 @@ export async function POST(request: NextRequest) {
                     return waitForApproval(confirmId);
                   }
                 : undefined,
-            },
-            body.message,
-            history,
-            memories,
-            body.images || [],
-          );
+          };
+
+          const skill = body.skillId ? await getSkill(body.skillId) : null;
+          const agentLoop = skill
+            ? runSkill(agentConfig, skill, body.message, history, memories)
+            : runAgentLoop(agentConfig, body.message, history, memories, body.images || []);
 
           for await (const event of agentLoop) {
             if (event.type === 'token') {
               fullResponse += event.data.content as string;
+            }
+            if (event.type === 'tool_start') {
+              HookExecutor.fireAndForget('on_tool_start', event.data);
+            } else if (event.type === 'tool_end') {
+              HookExecutor.fireAndForget('on_tool_end', event.data);
+            } else if (event.type === 'error') {
+              HookExecutor.fireAndForget('on_error', event.data);
+            } else if (event.type === 'done') {
+              HookExecutor.fireAndForget('on_response_complete', { ...event.data, response: fullResponse });
             }
             controller.enqueue(
               encoder.encode(formatSSE(event.type, event.data))
