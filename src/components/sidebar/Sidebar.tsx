@@ -64,6 +64,7 @@ export default function Sidebar({
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderColor, setNewFolderColor] = useState('#6366f1');
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -107,12 +108,22 @@ export default function Sidebar({
     }
   };
 
+  // Collect all unique tags
+  const allTags = Array.from(
+    new Set(conversations.flatMap((c) => c.tags || []))
+  ).sort();
+
+  // Filter by active tag
+  const filtered = activeTag
+    ? conversations.filter((c) => c.tags?.includes(activeTag))
+    : conversations;
+
   // Group conversations
-  const pinned = conversations.filter((c) => c.pinned);
+  const pinned = filtered.filter((c) => c.pinned);
   const byFolder = new Map<string, ConversationMeta[]>();
   const uncategorized: ConversationMeta[] = [];
 
-  for (const conv of conversations) {
+  for (const conv of filtered) {
     if (conv.pinned) continue; // pinned shown separately
     if (conv.folderId) {
       const list = byFolder.get(conv.folderId) || [];
@@ -219,9 +230,36 @@ export default function Sidebar({
           />
         </div>
 
+        {/* Tag filter */}
+        {allTags.length > 0 && !searchQuery && (
+          <div className="px-3 py-1 flex gap-1 flex-wrap">
+            {activeTag && (
+              <button
+                onClick={() => setActiveTag(null)}
+                className="px-2 py-0.5 text-[10px] rounded-full bg-error/20 text-error hover:bg-error/30 transition-colors"
+              >
+                초기화
+              </button>
+            )}
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                className={`px-2 py-0.5 text-[10px] rounded-full transition-colors ${
+                  activeTag === tag
+                    ? 'bg-accent text-white'
+                    : 'bg-card text-muted hover:text-foreground hover:bg-card-hover'
+                }`}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto px-2 py-1">
-          {conversations.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="text-center text-muted text-xs py-8">
               {searchQuery ? '검색 결과가 없습니다' : '대화가 없습니다'}
             </div>
