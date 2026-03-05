@@ -13,8 +13,7 @@ export default function SystemPromptEditor({ value, onChange }: SystemPromptEdit
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium">System Prompt</label>
+      <div className="flex items-center justify-end mb-2">
         <button
           onClick={() => setShowTemplates(!showTemplates)}
           className="text-xs text-accent hover:text-accent-hover"
@@ -45,7 +44,7 @@ export default function SystemPromptEditor({ value, onChange }: SystemPromptEdit
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={8}
-        className="w-full bg-[#111] border border-border rounded-lg px-3 py-2 text-sm font-[family-name:var(--font-jetbrains)] resize-y focus:outline-none focus:border-accent"
+        className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm font-[family-name:var(--font-jetbrains)] resize-y focus:outline-none focus:border-accent"
         placeholder="시스템 프롬프트를 입력하세요..."
       />
     </div>

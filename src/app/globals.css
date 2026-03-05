@@ -12,6 +12,8 @@
   --success: #22c55e;
   --error: #ef4444;
   --warning: #f59e0b;
+  --code-block: #111111;
+  --code-inline: #262626;
 }
 
 [data-theme='light'] {
@@ -26,14 +28,8 @@
   --success: #22c55e;
   --error: #ef4444;
   --warning: #f59e0b;
-}
-
-[data-theme='light'] pre code.hljs {
-  background: #f5f5f5 !important;
-}
-
-[data-theme='light'] code:not(pre code) {
-  background: #e5e5e5;
+  --code-block: #f5f5f5;
+  --code-inline: #e5e5e5;
 }
 
 @theme inline {
@@ -48,6 +44,8 @@
   --color-success: var(--success);
   --color-error: var(--error);
   --color-warning: var(--warning);
+  --color-code-block: var(--code-block);
+  --color-code-inline: var(--code-inline);
 }
 
 body {
@@ -72,7 +70,7 @@ body {
 
 /* Code highlighting */
 pre code.hljs {
-  background: #111111 !important;
+  background: var(--code-block) !important;
   border-radius: 0.5rem;
   padding: 1rem !important;
   font-size: 0.875rem;
@@ -80,7 +78,7 @@ pre code.hljs {
 }
 
 code:not(pre code) {
-  background: #262626;
+  background: var(--code-inline);
   padding: 0.15rem 0.4rem;
   border-radius: 0.25rem;
   font-size: 0.875em;

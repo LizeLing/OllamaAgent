@@ -53,7 +53,7 @@ export default function ToolCallDisplay({ toolCall }: ToolCallDisplayProps) {
         <div className="px-3 pb-2 space-y-1">
           <div>
             <span className="text-muted">Input:</span>
-            <pre className="mt-1 p-2 bg-[#111] rounded text-[11px] overflow-x-auto font-[family-name:var(--font-jetbrains)]">
+            <pre className="mt-1 p-2 bg-code-block rounded text-[11px] overflow-x-auto font-[family-name:var(--font-jetbrains)]">
               {JSON.stringify(toolCall.input, null, 2)}
             </pre>
           </div>
@@ -70,7 +70,7 @@ export default function ToolCallDisplay({ toolCall }: ToolCallDisplayProps) {
                   </button>
                 )}
               </div>
-              <pre className={`mt-1 p-2 bg-[#111] rounded text-[11px] overflow-x-auto overflow-y-auto font-[family-name:var(--font-jetbrains)] ${showFullOutput ? 'max-h-[500px]' : 'max-h-48'}`}>
+              <pre className={`mt-1 p-2 bg-code-block rounded text-[11px] overflow-x-auto overflow-y-auto font-[family-name:var(--font-jetbrains)] ${showFullOutput ? 'max-h-[500px]' : 'max-h-48'}`}>
                 {showFullOutput ? outputText : outputText.slice(0, 500)}
                 {!showFullOutput && isTruncated && '...'}
               </pre>

@@ -92,6 +92,8 @@ export default function ChatInput({ onSend, onCommand, disabled, onDrop }: ChatI
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.nativeEvent.isComposing) return;
+
     if (showCompletions) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();

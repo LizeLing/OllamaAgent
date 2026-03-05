@@ -18,7 +18,7 @@ export default function McpServerManager({ servers, onChange }: McpServerManager
   const [testResult, setTestResult] = useState<Record<string, boolean>>({});
 
   const inputClass =
-    'w-full bg-[#111] border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent';
+    'w-full bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent';
 
   const handleAdd = () => {
     if (!name || !url) return;
@@ -63,8 +63,7 @@ export default function McpServerManager({ servers, onChange }: McpServerManager
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-sm font-medium">MCP 서버</label>
+      <div className="flex items-center justify-end mb-2">
         <button
           onClick={() => setIsAdding(!isAdding)}
           className="text-xs text-accent hover:text-accent-hover"

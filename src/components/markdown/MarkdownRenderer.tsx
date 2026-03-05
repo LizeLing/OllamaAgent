@@ -76,13 +76,13 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return (
               <div className="relative group my-2">
                 {lang && (
-                  <div className="flex items-center justify-between px-4 py-1.5 bg-[#1a1a1a] rounded-t-lg border-b border-[#333]">
+                  <div className="flex items-center justify-between px-4 py-1.5 bg-card rounded-t-lg border-b border-border">
                     <span className="text-[11px] text-muted font-mono">{lang}</span>
                     <CopyButton code={codeText} />
                   </div>
                 )}
                 <pre
-                  className={`overflow-x-auto ${lang ? 'rounded-b-lg rounded-t-none' : 'rounded-lg'} bg-[#111] p-4 font-[family-name:var(--font-jetbrains)] text-sm`}
+                  className={`overflow-x-auto ${lang ? 'rounded-b-lg rounded-t-none' : 'rounded-lg'} bg-code-block p-4 font-[family-name:var(--font-jetbrains)] text-sm`}
                   {...props}
                 >
                   {children}
@@ -101,7 +101,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
             if (isInline) {
               return (
                 <code
-                  className="bg-[#262626] px-1.5 py-0.5 rounded text-sm font-[family-name:var(--font-jetbrains)]"
+                  className="bg-code-inline px-1.5 py-0.5 rounded text-sm font-[family-name:var(--font-jetbrains)]"
                   {...props}
                 >
                   {children}

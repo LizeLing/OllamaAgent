@@ -25,14 +25,14 @@ export default function PathConfigEditor({ label, paths, onChange }: PathConfigE
 
   return (
     <div>
-      <label className="block text-sm font-medium mb-2">{label}</label>
+      {label && <label className="block text-sm font-medium mb-2">{label}</label>}
       <div className="flex gap-2 mb-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && addPath()}
           placeholder="/path/to/directory"
-          className="flex-1 bg-[#111] border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
+          className="flex-1 bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
         />
         <button
           onClick={addPath}
@@ -43,7 +43,7 @@ export default function PathConfigEditor({ label, paths, onChange }: PathConfigE
       </div>
       <div className="space-y-1">
         {paths.map((p, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm bg-[#111] rounded px-3 py-1.5">
+          <div key={i} className="flex items-center gap-2 text-sm bg-card rounded px-3 py-1.5">
             <span className="flex-1 font-[family-name:var(--font-jetbrains)] text-xs truncate">
               {p}
             </span>

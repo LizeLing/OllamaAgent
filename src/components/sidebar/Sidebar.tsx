@@ -38,6 +38,8 @@ interface SidebarProps {
   onDeleteFolder: (id: string) => void;
   onRenameFolder: (id: string, name: string) => void;
   onUpdateTags: (id: string, tags: string[]) => void;
+  settingsOpen?: boolean;
+  onSettingsOpen: () => void;
 }
 
 export default function Sidebar({
@@ -60,6 +62,8 @@ export default function Sidebar({
   onDeleteFolder,
   onRenameFolder,
   onUpdateTags,
+  settingsOpen,
+  onSettingsOpen,
 }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -306,31 +310,47 @@ export default function Sidebar({
         </div>
 
         {/* Bottom actions */}
-        <div className="p-3 border-t border-border flex gap-2">
-          <button
-            onClick={handleImportClick}
-            className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="17,8 12,3 7,8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            가져오기
-          </button>
-          {activeId && (
+        <div className="p-3 border-t border-border space-y-2">
+          <div className="flex gap-2">
             <button
-              onClick={() => handleExport(activeId)}
+              onClick={handleImportClick}
               className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="7,10 12,15 17,10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
+                <polyline points="17,8 12,3 7,8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              내보내기
+              가져오기
             </button>
-          )}
+            {activeId && (
+              <button
+                onClick={() => handleExport(activeId)}
+                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7,10 12,15 17,10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                내보내기
+              </button>
+            )}
+          </div>
+          <button
+            onClick={onSettingsOpen}
+            className={`w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+              settingsOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-muted bg-card hover:text-foreground hover:bg-card-hover'
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+            </svg>
+            설정
+          </button>
         </div>
 
         <input
