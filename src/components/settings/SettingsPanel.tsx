@@ -259,6 +259,58 @@ export default function SettingsPanel({ isOpen, onClose, settings, onSave }: Set
               onChange={(servers) => setDraft({ ...draft, mcpServers: servers })}
             />
 
+            {/* Settings Import/Export */}
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/settings/export');
+                    if (!res.ok) return;
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ollamaagent-settings.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    // export failed
+                  }
+                }}
+                className="flex-1 py-2 text-sm text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
+              >
+                설정 내보내기
+              </button>
+              <label className="flex-1 py-2 text-sm text-center text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors cursor-pointer">
+                설정 가져오기
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const text = await file.text();
+                      const data = JSON.parse(text);
+                      const res = await fetch('/api/settings/import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data),
+                      });
+                      if (res.ok) {
+                        const result = await res.json();
+                        setDraft({ ...result.settings });
+                      }
+                    } catch {
+                      // import failed
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            </div>
+
             <button
               onClick={handleSave}
               disabled={saving}
