@@ -38,6 +38,13 @@ class ToolRegistry {
     return Array.from(this.tools.keys());
   }
 
+  replaceAll(newTools: BaseTool[]): void {
+    this.tools.clear();
+    for (const tool of newTools) {
+      this.tools.set(tool.definition.name, tool);
+    }
+  }
+
   /** Convert tool definitions to Ollama native tool format */
   toOllamaTools(enabledTools?: string[]): OllamaTool[] {
     let tools = Array.from(this.tools.values());

@@ -13,32 +13,49 @@ import { CustomTool } from './custom-tool';
 import { McpTool } from './mcp-tool';
 import { CustomToolDef, McpServerConfig } from '@/types/settings';
 import { listTools } from '@/lib/mcp/client';
+import { BaseTool } from './base-tool';
 
 let lastConfigHash = '';
+let initPromise: Promise<void> | null = null;
 
-export function initializeTools(
+export async function initializeTools(
   allowedPaths: string[],
   deniedPaths: string[],
   searxngUrl: string = 'http://localhost:8888',
   ollamaUrl: string = 'http://localhost:11434',
   imageModel: string = 'x/z-image-turbo:latest'
 ) {
-  // 설정이 동일하면 재등록 스킵 (성능 최적화)
   const configHash = JSON.stringify({ allowedPaths, deniedPaths, searxngUrl, ollamaUrl, imageModel });
   if (configHash === lastConfigHash) return;
 
-  toolRegistry.clear();
+  // Prevent concurrent initialization
+  if (initPromise) {
+    await initPromise;
+    return;
+  }
 
-  toolRegistry.register(new FilesystemReadTool(allowedPaths, deniedPaths));
-  toolRegistry.register(new FilesystemWriteTool(allowedPaths, deniedPaths));
-  toolRegistry.register(new FilesystemListTool(allowedPaths, deniedPaths));
-  toolRegistry.register(new FilesystemSearchTool(allowedPaths, deniedPaths));
-  toolRegistry.register(new HttpClientTool());
-  toolRegistry.register(new WebSearchTool(searxngUrl));
-  toolRegistry.register(new CodeExecutorTool());
-  toolRegistry.register(new ImageGeneratorTool(ollamaUrl, imageModel));
+  initPromise = (async () => {
+    try {
+      // Build all tools first, then swap atomically
+      const tools: BaseTool[] = [
+        new FilesystemReadTool(allowedPaths, deniedPaths),
+        new FilesystemWriteTool(allowedPaths, deniedPaths),
+        new FilesystemListTool(allowedPaths, deniedPaths),
+        new FilesystemSearchTool(allowedPaths, deniedPaths),
+        new HttpClientTool(),
+        new WebSearchTool(searxngUrl),
+        new CodeExecutorTool(),
+        new ImageGeneratorTool(ollamaUrl, imageModel),
+      ];
 
-  lastConfigHash = configHash;
+      toolRegistry.replaceAll(tools);
+      lastConfigHash = configHash;
+    } finally {
+      initPromise = null;
+    }
+  })();
+
+  await initPromise;
 }
 
 export function registerCustomTools(customTools: CustomToolDef[]) {
