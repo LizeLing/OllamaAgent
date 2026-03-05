@@ -12,6 +12,8 @@ import ThemeToggle from '@/components/ui/ThemeToggle';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
 import ShortcutGuide from '@/components/ui/ShortcutGuide';
+import StatsPanel from '@/components/ui/StatsPanel';
+import ToolLogPanel from '@/components/ui/ToolLogPanel';
 
 export default function ChatContainer() {
   const {
@@ -51,6 +53,8 @@ export default function ChatContainer() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [toolLogOpen, setToolLogOpen] = useState(false);
   const [isDragOverPage, setIsDragOverPage] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -371,6 +375,26 @@ export default function ChatContainer() {
             </button>
             <ThemeToggle />
             <button
+              onClick={() => setToolLogOpen(true)}
+              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
+              title="도구 로그"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setStatsOpen(true)}
+              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
+              title="통계"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </button>
+            <button
               onClick={() => setShortcutGuideOpen(true)}
               className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
               title="단축키 (?)"
@@ -428,6 +452,9 @@ export default function ChatContainer() {
 
       {/* Shortcut Guide */}
       <ShortcutGuide isOpen={shortcutGuideOpen} onClose={() => setShortcutGuideOpen(false)} />
+
+      <StatsPanel isOpen={statsOpen} onClose={() => setStatsOpen(false)} />
+      <ToolLogPanel isOpen={toolLogOpen} onClose={() => setToolLogOpen(false)} messages={messages} />
     </div>
   );
 }
