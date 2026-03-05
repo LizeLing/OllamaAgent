@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import VoiceButton from '@/components/voice/VoiceButton';
 import { useVoice } from '@/hooks/useVoice';
+import { parseCommand, getCompletions } from '@/lib/commands/registry';
+import { CommandDefinition } from '@/lib/commands/definitions';
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_IMAGE_DIMENSION = 2048;
@@ -50,11 +52,12 @@ const processImage = async (file: File): Promise<string | null> => {
 
 interface ChatInputProps {
   onSend: (message: string, images?: string[]) => void;
+  onCommand?: (name: string, args: string[]) => void;
   disabled?: boolean;
   onDrop?: (files: FileList) => void;
 }
 
-export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) {
+export default function ChatInput({ onSend, onCommand, disabled, onDrop }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -62,18 +65,58 @@ export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isRecording, isTranscribing, startRecording, stopRecording } = useVoice();
 
+  const [completions, setCompletions] = useState<CommandDefinition[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const showCompletions = completions.length > 0;
+
   const handleSend = () => {
     const trimmed = input.trim();
     if ((!trimmed && attachedImages.length === 0) || disabled) return;
+
+    const parsed = parseCommand(trimmed);
+    if (parsed && onCommand) {
+      onCommand(parsed.name, parsed.args);
+      setInput('');
+      setCompletions([]);
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
     onSend(trimmed || '이 이미지를 분석해주세요.', attachedImages.length > 0 ? attachedImages : undefined);
     setInput('');
     setAttachedImages([]);
+    setCompletions([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showCompletions) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, completions.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault();
+        const cmd = completions[selectedIndex];
+        const hasArgs = cmd.args && cmd.args.length > 0;
+        setInput(`/${cmd.name}${hasArgs ? ' ' : ''}`);
+        setCompletions([]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setCompletions([]);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -216,12 +259,42 @@ export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) 
             className="hidden"
           />
           <div className="flex-1 relative">
+            {showCompletions && (
+              <div className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden z-10">
+                {completions.map((cmd, i) => (
+                  <button
+                    key={cmd.name}
+                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                      i === selectedIndex ? 'bg-accent/20 text-accent' : 'text-foreground hover:bg-card-hover'
+                    }`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const hasArgs = cmd.args && cmd.args.length > 0;
+                      setInput(`/${cmd.name}${hasArgs ? ' ' : ''}`);
+                      setCompletions([]);
+                      textareaRef.current?.focus();
+                    }}
+                  >
+                    <span className="font-mono text-accent">/{cmd.name}</span>
+                    <span className="text-muted text-xs">{cmd.description}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => {
-                setInput(e.target.value);
+                const val = e.target.value;
+                setInput(val);
                 handleInput();
+                if (val.startsWith('/')) {
+                  const results = getCompletions(val);
+                  setCompletions(results);
+                  setSelectedIndex(0);
+                } else {
+                  setCompletions([]);
+                }
               }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
