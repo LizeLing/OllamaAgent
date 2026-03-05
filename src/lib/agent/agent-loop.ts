@@ -90,7 +90,7 @@ export async function* runAgentLoop(
     });
 
     // Execute each tool call
-    const DANGEROUS_TOOLS = ['code_executor', 'filesystem_write'];
+    const DANGEROUS_TOOLS = ['code_execute', 'filesystem_write'];
 
     for (const tc of toolCalls) {
       const toolName = tc.function.name;
