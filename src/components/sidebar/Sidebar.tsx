@@ -6,6 +6,17 @@ import { FolderMeta } from '@/types/folder';
 import ConversationItem from './ConversationItem';
 import FolderGroup from './FolderGroup';
 
+const FOLDER_COLORS = [
+  '#6366f1', // indigo
+  '#ec4899', // pink
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#ef4444', // red
+  '#8b5cf6', // violet
+  '#06b6d4', // cyan
+];
+
 interface SidebarProps {
   conversations: ConversationMeta[];
   folders: FolderMeta[];
@@ -52,6 +63,7 @@ export default function Sidebar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderColor, setNewFolderColor] = useState('#6366f1');
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -88,8 +100,9 @@ export default function Sidebar({
   const handleCreateFolder = () => {
     const trimmed = newFolderName.trim();
     if (trimmed) {
-      onCreateFolder(trimmed);
+      onCreateFolder(trimmed, newFolderColor);
       setNewFolderName('');
+      setNewFolderColor('#6366f1');
       setShowNewFolder(false);
     }
   };
@@ -164,20 +177,34 @@ export default function Sidebar({
 
         {/* New folder input */}
         {showNewFolder && (
-          <div className="px-3 py-2 border-b border-border flex gap-2">
-            <input
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateFolder();
-                if (e.key === 'Escape') setShowNewFolder(false);
-              }}
-              placeholder="폴더 이름..."
-              className="flex-1 text-sm bg-card text-foreground placeholder:text-muted rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent border border-border"
-              autoFocus
-            />
-            <button onClick={handleCreateFolder} className="text-xs text-accent hover:text-accent-hover">생성</button>
-            <button onClick={() => setShowNewFolder(false)} className="text-xs text-muted hover:text-foreground">취소</button>
+          <div className="px-3 py-2 border-b border-border space-y-2">
+            <div className="flex gap-2">
+              <input
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateFolder();
+                  if (e.key === 'Escape') setShowNewFolder(false);
+                }}
+                placeholder="폴더 이름..."
+                className="flex-1 text-sm bg-card text-foreground placeholder:text-muted rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-accent border border-border"
+                autoFocus
+              />
+              <button onClick={handleCreateFolder} className="text-xs text-accent hover:text-accent-hover">생성</button>
+              <button onClick={() => setShowNewFolder(false)} className="text-xs text-muted hover:text-foreground">취소</button>
+            </div>
+            <div className="flex gap-1.5">
+              {FOLDER_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setNewFolderColor(color)}
+                  className={`w-5 h-5 rounded-full transition-all ${
+                    newFolderColor === color ? 'ring-2 ring-offset-1 ring-offset-background ring-accent scale-110' : 'hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
           </div>
         )}
 

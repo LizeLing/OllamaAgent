@@ -10,18 +10,55 @@ interface MessageListProps {
   isLoading: boolean;
   onEdit?: (id: string, content: string) => void;
   onRegenerate?: () => void;
+  onSend?: (content: string) => void;
 }
 
-export default function MessageList({ messages, isLoading, onEdit, onRegenerate }: MessageListProps) {
+const SUGGESTIONS = [
+  {
+    icon: '💻',
+    title: '코드 작성',
+    prompt: 'Python으로 간단한 웹 스크래퍼를 만들어주세요',
+  },
+  {
+    icon: '📄',
+    title: '파일 분석',
+    prompt: '현재 디렉토리의 파일 목록을 보여주세요',
+  },
+  {
+    icon: '🔍',
+    title: '웹 검색',
+    prompt: '최신 AI 뉴스를 검색해주세요',
+  },
+  {
+    icon: '🧮',
+    title: '문제 풀기',
+    prompt: '피보나치 수열의 10번째 값을 구하는 코드를 작성하고 실행해주세요',
+  },
+];
+
+export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend }: MessageListProps) {
   const { ref } = useAutoScroll<HTMLDivElement>(messages);
 
   if (messages.length === 0) {
     return (
       <div ref={ref} className="flex-1 flex items-center justify-center overflow-y-auto">
-        <div className="text-center text-muted">
+        <div className="text-center max-w-lg px-4">
           <div className="text-4xl mb-4">🤖</div>
           <h2 className="text-lg font-medium text-foreground mb-2">OllamaAgent</h2>
-          <p className="text-sm">무엇이든 물어보세요</p>
+          <p className="text-sm text-muted mb-6">무엇이든 물어보세요</p>
+          <div className="grid grid-cols-2 gap-3">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s.title}
+                onClick={() => onSend?.(s.prompt)}
+                className="text-left p-3 bg-card hover:bg-card-hover border border-border rounded-xl transition-colors group"
+              >
+                <div className="text-lg mb-1">{s.icon}</div>
+                <div className="text-xs font-medium text-foreground mb-0.5">{s.title}</div>
+                <div className="text-[11px] text-muted leading-snug line-clamp-2">{s.prompt}</div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
