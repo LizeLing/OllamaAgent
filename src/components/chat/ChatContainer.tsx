@@ -145,7 +145,11 @@ export default function ChatContainer() {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         if (res.ok) {
           const data = await res.json();
-          handleSend(`파일 "${data.originalName}"을 업로드했습니다. (경로: ${data.path})`);
+          if (data.content) {
+            handleSend(`파일 "${data.originalName}"의 내용입니다:\n\n\`\`\`\n${data.content}\n\`\`\``);
+          } else {
+            handleSend(`파일 "${data.originalName}"을 업로드했습니다. (경로: ${data.path})`);
+          }
         }
       } catch {
         // Upload failed

@@ -24,15 +24,19 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     await fs.writeFile(filepath, Buffer.from(bytes));
 
-    // If text file, try to save to memory
+    // If text file, read content and try to save to memory
     const textExtensions = ['.txt', '.md', '.json', '.csv', '.log', '.ts', '.js', '.py'];
-    if (textExtensions.includes(ext.toLowerCase())) {
+    const isText = textExtensions.includes(ext.toLowerCase());
+    let textContent: string | undefined;
+
+    if (isText) {
+      textContent = Buffer.from(bytes).toString('utf-8');
+      // Save to memory
       try {
         const settings = await loadSettings();
-        const content = Buffer.from(bytes).toString('utf-8');
         const memoryManager = new MemoryManager(settings.ollamaUrl, settings.embeddingModel);
         await memoryManager.saveMemory(
-          `File: ${file.name}\n${content.slice(0, 2000)}`,
+          `File: ${file.name}\n${textContent.slice(0, 2000)}`,
           { type: 'upload', filename: file.name }
         );
       } catch {
@@ -45,6 +49,7 @@ export async function POST(request: NextRequest) {
       originalName: file.name,
       path: filepath,
       size: file.size,
+      content: textContent?.slice(0, 5000),
     });
   } catch (error) {
     return NextResponse.json(
