@@ -1,0 +1,67 @@
+import { AgentSkill } from '@/types/skills';
+
+export const DEFAULT_SKILLS: AgentSkill[] = [
+  {
+    id: 'code-review',
+    name: '코드 리뷰',
+    description: '코드를 분석하고 품질, 패턴, 잠재적 문제를 평가합니다.',
+    icon: '🔍',
+    triggerCommand: 'code-review',
+    enabledTools: ['filesystem_read', 'filesystem_list', 'filesystem_search'],
+    maxIterations: 15,
+    workflow: [
+      { id: 'cr-1', instruction: '대상 코드 파일을 탐색하고 목록을 파악합니다' },
+      { id: 'cr-2', instruction: '각 파일의 코드를 읽고 분석합니다' },
+      { id: 'cr-3', instruction: '코드 품질, 패턴, 잠재적 문제를 평가합니다' },
+      { id: 'cr-4', instruction: '리뷰 결과를 정리하여 보고합니다' },
+    ],
+    isBuiltin: true,
+  },
+  {
+    id: 'research-report',
+    name: '리서치 보고서',
+    description: '주제를 웹에서 조사하고 종합적인 보고서를 작성합니다.',
+    icon: '📊',
+    triggerCommand: 'research',
+    enabledTools: ['web_search', 'http_request', 'filesystem_read'],
+    maxIterations: 20,
+    workflow: [
+      { id: 'rr-1', instruction: '주제에 대한 핵심 키워드를 도출하고 검색 전략을 수립합니다' },
+      { id: 'rr-2', instruction: '웹 검색을 통해 관련 자료를 수집합니다' },
+      { id: 'rr-3', instruction: '수집된 자료를 분석하고 핵심 인사이트를 추출합니다' },
+      { id: 'rr-4', instruction: '종합적인 보고서를 작성합니다' },
+    ],
+    isBuiltin: true,
+  },
+  {
+    id: 'debug-assistant',
+    name: '디버그 보조',
+    description: '버그를 분석하고 원인을 파악하여 수정 방안을 제시합니다.',
+    icon: '🐛',
+    triggerCommand: 'debug',
+    enabledTools: ['filesystem_read', 'filesystem_search', 'code_execute'],
+    maxIterations: 15,
+    workflow: [
+      { id: 'da-1', instruction: '버그 증상을 파악하고 관련 코드를 탐색합니다' },
+      { id: 'da-2', instruction: '에러 로그와 코드 흐름을 분석하여 원인을 추적합니다' },
+      { id: 'da-3', instruction: '코드 실행을 통해 가설을 검증합니다' },
+      { id: 'da-4', instruction: '근본 원인과 수정 방안을 정리하여 보고합니다' },
+    ],
+    isBuiltin: true,
+  },
+  {
+    id: 'data-analysis',
+    name: '데이터 분석',
+    description: '데이터를 읽고 분석하여 인사이트를 도출합니다.',
+    icon: '📈',
+    triggerCommand: 'analyze',
+    enabledTools: ['filesystem_read', 'code_execute'],
+    maxIterations: 15,
+    workflow: [
+      { id: 'an-1', instruction: '데이터 파일을 읽고 구조와 특성을 파악합니다' },
+      { id: 'an-2', instruction: '코드를 실행하여 통계 분석과 시각화를 수행합니다' },
+      { id: 'an-3', instruction: '분석 결과를 종합하여 인사이트 보고서를 작성합니다' },
+    ],
+    isBuiltin: true,
+  },
+];
