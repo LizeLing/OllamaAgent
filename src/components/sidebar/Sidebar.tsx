@@ -25,6 +25,7 @@ interface SidebarProps {
   onCreateFolder: (name: string, color?: string) => void;
   onDeleteFolder: (id: string) => void;
   onRenameFolder: (id: string, name: string) => void;
+  onUpdateTags: (id: string, tags: string[]) => void;
 }
 
 export default function Sidebar({
@@ -46,6 +47,7 @@ export default function Sidebar({
   onCreateFolder,
   onDeleteFolder,
   onRenameFolder,
+  onUpdateTags,
 }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -118,6 +120,7 @@ export default function Sidebar({
       onRename={onRename}
       onTogglePin={onTogglePin}
       onMoveToFolder={onMoveToFolder}
+      onUpdateTags={onUpdateTags}
       folders={folders}
     />
   );
