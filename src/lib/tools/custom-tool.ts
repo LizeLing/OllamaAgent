@@ -1,6 +1,7 @@
 import { BaseTool } from './base-tool';
 import { ToolDefinition, ToolResult } from '@/lib/agent/types';
 import { CustomToolDef } from '@/types/settings';
+import { validateUrlForSSRF } from './url-validator';
 
 export class CustomTool extends BaseTool {
   definition: ToolDefinition;
@@ -29,6 +30,12 @@ export class CustomTool extends BaseTool {
         body = this.config.bodyTemplate.replace(/\{\{(\w+)\}\}/g, (_, key) => String(args[key] || ''));
       } else {
         body = JSON.stringify(args);
+      }
+
+      // SSRF prevention
+      const urlCheck = validateUrlForSSRF(url);
+      if (!urlCheck.valid) {
+        return this.error(urlCheck.error || '유효하지 않은 URL입니다.');
       }
 
       const res = await fetch(url, {
