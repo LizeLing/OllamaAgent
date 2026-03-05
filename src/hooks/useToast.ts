@@ -42,8 +42,9 @@ function getSnapshot() {
   return snapshot;
 }
 
+const SERVER_SNAPSHOT: Toast[] = [];
 function getServerSnapshot() {
-  return [];
+  return SERVER_SNAPSHOT;
 }
 
 export function useToast() {

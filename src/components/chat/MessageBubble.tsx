@@ -1,12 +1,44 @@
 'use client';
 
-import { useState, memo } from 'react';
-import { Message } from '@/types/message';
+import { useState, memo, useMemo } from 'react';
+import { Message, ToolCallInfo } from '@/types/message';
 import MarkdownRenderer from '@/components/markdown/MarkdownRenderer';
 import ToolCallDisplay from './ToolCallDisplay';
 import ImageDisplay from './ImageDisplay';
 import AudioPlayer from '@/components/voice/AudioPlayer';
 import { useVoice } from '@/hooks/useVoice';
+
+type ContentSegment =
+  | { type: 'text'; content: string }
+  | { type: 'tool'; toolCall: ToolCallInfo };
+
+function buildSegments(content: string, toolCalls?: ToolCallInfo[]): ContentSegment[] {
+  if (!toolCalls || toolCalls.length === 0) {
+    return content ? [{ type: 'text', content }] : [];
+  }
+
+  const sorted = [...toolCalls].sort(
+    (a, b) => (a.contentIndex ?? 0) - (b.contentIndex ?? 0)
+  );
+
+  const segments: ContentSegment[] = [];
+  let cursor = 0;
+
+  for (const tc of sorted) {
+    const idx = tc.contentIndex ?? 0;
+    if (idx > cursor) {
+      segments.push({ type: 'text', content: content.slice(cursor, idx) });
+    }
+    segments.push({ type: 'tool', toolCall: tc });
+    cursor = Math.max(cursor, idx);
+  }
+
+  if (cursor < content.length) {
+    segments.push({ type: 'text', content: content.slice(cursor) });
+  }
+
+  return segments;
+}
 
 function ThinkingToggle({ content, duration }: { content: string; duration?: number }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,6 +103,11 @@ export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRe
   const [editContent, setEditContent] = useState(message.content);
   const [copied, setCopied] = useState(false);
 
+  const segments = useMemo(
+    () => (!isUser ? buildSegments(message.content, message.toolCalls) : []),
+    [isUser, message.content, message.toolCalls]
+  );
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
     setCopied(true);
@@ -91,14 +128,6 @@ export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRe
             content={message.thinkingContent}
             duration={message.thinkingDuration}
           />
-        )}
-
-        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="mb-2 space-y-2">
-            {message.toolCalls.map((tc) => (
-              <ToolCallDisplay key={tc.id} toolCall={tc} />
-            ))}
-          </div>
         )}
 
         {isUser && message.attachedImages && message.attachedImages.length > 0 && (
@@ -136,7 +165,15 @@ export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRe
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
           )
         ) : (
-          <MarkdownRenderer content={message.content} />
+          segments.map((seg, i) =>
+            seg.type === 'text' ? (
+              <MarkdownRenderer key={`t-${i}`} content={seg.content} />
+            ) : (
+              <div key={seg.toolCall.id} className="my-2">
+                <ToolCallDisplay toolCall={seg.toolCall} />
+              </div>
+            )
+          )
         )}
 
         {!isUser && message.aborted && (
