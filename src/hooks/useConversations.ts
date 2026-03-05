@@ -4,8 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { ConversationMeta } from '@/types/conversation';
 import { FolderMeta } from '@/types/folder';
 
+export interface ConversationWithSnippet extends ConversationMeta {
+  matchedSnippet?: string;
+  matchType?: 'title' | 'content';
+}
+
 export function useConversations() {
-  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
+  const [conversations, setConversations] = useState<ConversationWithSnippet[]>([]);
   const [folders, setFolders] = useState<FolderMeta[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');

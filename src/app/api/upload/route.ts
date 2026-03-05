@@ -5,6 +5,7 @@ import { DATA_DIR } from '@/lib/config/constants';
 import fs from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/middleware/rate-limiter';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_EXTENSIONS = [
@@ -23,6 +24,14 @@ const TEXT_EXTENSIONS = [
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIP = request.headers.get('x-forwarded-for') || 'unknown';
+    if (!checkRateLimit(`upload:${clientIP}`, RATE_LIMITS.upload)) {
+      return NextResponse.json(
+        { error: '업로드 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+        { status: 429 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     if (!file) {

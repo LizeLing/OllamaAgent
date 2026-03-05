@@ -11,6 +11,7 @@ interface MessageListProps {
   onEdit?: (id: string, content: string) => void;
   onRegenerate?: () => void;
   onSend?: (content: string) => void;
+  onBranch?: (messageId: string) => void;
 }
 
 const SUGGESTIONS = [
@@ -36,7 +37,7 @@ const SUGGESTIONS = [
   },
 ];
 
-export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend }: MessageListProps) {
+export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend, onBranch }: MessageListProps) {
   const { ref } = useAutoScroll<HTMLDivElement>(messages);
 
   if (messages.length === 0) {
@@ -74,6 +75,7 @@ export default function MessageList({ messages, isLoading, onEdit, onRegenerate,
             onEdit={onEdit}
             onRegenerate={onRegenerate}
             onRetry={onRegenerate}
+            onBranch={onBranch}
             isLast={idx === messages.length - 1}
           />
         ))}

@@ -21,7 +21,7 @@ function formatTimeAgo(timestamp: number): string {
 }
 
 interface ConversationItemProps {
-  conversation: ConversationMeta;
+  conversation: ConversationMeta & { matchedSnippet?: string; matchType?: string };
   isActive: boolean;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -125,6 +125,11 @@ export default function ConversationItem({
                     <span className="text-[9px] text-muted">+{conversation.tags.length - 2}</span>
                   )}
                 </div>
+              )}
+              {conversation.matchedSnippet && (
+                <p className="text-[10px] text-muted/70 truncate mt-0.5">
+                  &ldquo;{conversation.matchedSnippet}&rdquo;
+                </p>
               )}
             </div>
           </>

@@ -47,6 +47,7 @@ interface MessageBubbleProps {
   onEdit?: (id: string, content: string) => void;
   onRegenerate?: () => void;
   onRetry?: () => void;
+  onBranch?: (messageId: string) => void;
   isLast?: boolean;
 }
 
@@ -62,7 +63,7 @@ function formatTime(timestamp: number): string {
   return `${dateStr} ${time}`;
 }
 
-export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, isLast }: MessageBubbleProps) {
+export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, onBranch, isLast }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { isSpeaking, speak, stopSpeaking } = useVoice();
   const [isEditing, setIsEditing] = useState(false);
@@ -213,6 +214,16 @@ export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, 
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 23 10 17 10"/>
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+              </button>
+            )}
+            {onBranch && (
+              <button onClick={() => onBranch(message.id)} className="p-1 text-muted hover:text-foreground" title="여기서 분기">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="6" y1="3" x2="6" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 0 1-9 9" />
                 </svg>
               </button>
             )}

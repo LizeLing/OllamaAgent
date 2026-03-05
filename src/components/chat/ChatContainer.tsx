@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useSettings } from '@/hooks/useSettings';
 import { useConversations } from '@/hooks/useConversations';
+import { addToast } from '@/hooks/useToast';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import SettingsPanel from '@/components/settings/SettingsPanel';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
+import ShortcutGuide from '@/components/ui/ShortcutGuide';
 
 export default function ChatContainer() {
   const {
@@ -48,7 +50,10 @@ export default function ChatContainer() {
   } = useConversations();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
+  const [isDragOverPage, setIsDragOverPage] = useState(false);
   const prevMessagesLenRef = useRef(0);
+  const dragCounterRef = useRef(0);
 
   // Detect desktop on mount
   useEffect(() => {
@@ -77,6 +82,9 @@ export default function ChatContainer() {
       if (e.key === 'Escape' && isLoading) {
         stopGeneration();
       }
+      if (e.key === 'Escape' && shortcutGuideOpen) {
+        setShortcutGuideOpen(false);
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
         setSettingsOpen((prev) => !prev);
@@ -85,10 +93,14 @@ export default function ChatContainer() {
         e.preventDefault();
         handleNewChat();
       }
+      if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
+        e.preventDefault();
+        setShortcutGuideOpen((prev) => !prev);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLoading, stopGeneration, handleNewChat]);
+  }, [isLoading, stopGeneration, handleNewChat, shortcutGuideOpen]);
 
   const handleSelectConversation = useCallback(async (id: string) => {
     setActiveId(id);
@@ -108,7 +120,6 @@ export default function ChatContainer() {
   const handleSend = useCallback(async (content: string, images?: string[]) => {
     let currentConvId = conversationId;
 
-    // If no active conversation, create one first
     if (!currentConvId) {
       const newId = await createConversation();
       if (!newId) return;
@@ -119,7 +130,6 @@ export default function ChatContainer() {
 
     await sendMessage(content, images);
 
-    // Auto-title after first message
     if (messages.length === 0 && currentConvId) {
       setTimeout(async () => {
         try {
@@ -136,13 +146,46 @@ export default function ChatContainer() {
     }
   }, [conversationId, createConversation, setConversationId, setActiveId, sendMessage, messages.length, fetchConversations]);
 
+  // Branch conversation from a specific message
+  const handleBranch = useCallback(async (messageId: string) => {
+    const msgIndex = messages.findIndex((m) => m.id === messageId);
+    if (msgIndex === -1) return;
+
+    const branchedMessages = messages.slice(0, msgIndex + 1);
+    const newId = await createConversation('분기된 대화');
+    if (!newId) return;
+
+    try {
+      await fetch(`/api/conversations/${newId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: branchedMessages,
+          branchedFrom: conversationId ? { conversationId, messageIndex: msgIndex } : undefined,
+        }),
+      });
+      setConversationId(newId);
+      setActiveId(newId);
+      await loadConversation(newId);
+      prevMessagesLenRef.current = 0;
+      fetchConversations();
+      addToast('info', '대화가 분기되었습니다.');
+    } catch {
+      addToast('error', '대화 분기에 실패했습니다.');
+    }
+  }, [messages, conversationId, createConversation, setConversationId, setActiveId, loadConversation, fetchConversations]);
+
   const handleFileDrop = useCallback(async (files: FileList) => {
-    for (const file of Array.from(files)) {
+    for (const file of Array.from(files).slice(0, 5)) {
       const formData = new FormData();
       formData.append('file', file);
 
       try {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (res.status === 429) {
+          addToast('warning', '업로드 요청이 너무 많습니다.');
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           if (data.content) {
@@ -150,9 +193,12 @@ export default function ChatContainer() {
           } else {
             handleSend(`파일 "${data.originalName}"을 업로드했습니다. (경로: ${data.path})`);
           }
+        } else {
+          const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+          addToast('error', err.error || '업로드 실패');
         }
       } catch {
-        // Upload failed
+        addToast('error', '파일 업로드에 실패했습니다.');
       }
     }
   }, [handleSend]);
@@ -170,13 +216,40 @@ export default function ChatContainer() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      // export failed
+      addToast('error', '내보내기에 실패했습니다.');
     }
   }, []);
 
   const handleImport = useCallback(() => {
     fetchConversations();
   }, [fetchConversations]);
+
+  // Page-level drag overlay
+  const handlePageDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragOverPage(true);
+    }
+  }, []);
+
+  const handlePageDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragOverPage(false);
+    }
+  }, []);
+
+  const handlePageDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setIsDragOverPage(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileDrop(files);
+    }
+  }, [handleFileDrop]);
 
   // Touch swipe to open sidebar on mobile
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -198,7 +271,15 @@ export default function ChatContainer() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-background" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div
+      className="flex h-screen bg-background"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onDragEnter={handlePageDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={handlePageDragLeave}
+      onDrop={handlePageDrop}
+    >
       <Sidebar
         conversations={conversations}
         folders={folders}
@@ -221,7 +302,18 @@ export default function ChatContainer() {
         onUpdateTags={updateTags}
       />
 
-      <main className="flex-1 flex flex-col min-w-0">
+      <main className="flex-1 flex flex-col min-w-0 relative">
+        {/* Drag overlay */}
+        {isDragOverPage && (
+          <div className="absolute inset-0 z-20 bg-accent/10 border-2 border-dashed border-accent rounded-lg flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <div className="text-3xl mb-2">📁</div>
+              <p className="text-sm font-medium text-accent">파일을 놓아주세요</p>
+              <p className="text-xs text-muted mt-1">최대 5개 파일</p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
           <div className="flex items-center gap-3">
@@ -259,6 +351,17 @@ export default function ChatContainer() {
             </button>
             <ThemeToggle />
             <button
+              onClick={() => setShortcutGuideOpen(true)}
+              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
+              title="단축키 (?)"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </button>
+            <button
               onClick={() => setSettingsOpen(true)}
               className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
               title="Settings (Cmd+,)"
@@ -272,7 +375,14 @@ export default function ChatContainer() {
         </header>
 
         {/* Messages */}
-        <MessageList messages={messages} isLoading={isLoading} onEdit={editMessage} onRegenerate={regenerate} onSend={(msg) => handleSend(msg)} />
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
+          onEdit={editMessage}
+          onRegenerate={regenerate}
+          onSend={(msg) => handleSend(msg)}
+          onBranch={handleBranch}
+        />
 
         {/* Input */}
         <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} disabled={isLoading} onDrop={handleFileDrop} />
@@ -295,6 +405,9 @@ export default function ChatContainer() {
           onRespond={respondToApproval}
         />
       )}
+
+      {/* Shortcut Guide */}
+      <ShortcutGuide isOpen={shortcutGuideOpen} onClose={() => setShortcutGuideOpen(false)} />
     </div>
   );
 }
