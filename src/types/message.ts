@@ -9,6 +9,7 @@ export interface Message {
   thinkingContent?: string;
   thinkingDuration?: number;
   error?: string;
+  aborted?: boolean;
 }
 
 export interface ToolCallInfo {

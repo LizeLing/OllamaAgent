@@ -115,7 +115,15 @@ export function useChat() {
         }
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Mark message as aborted
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, aborted: true } : m
+          )
+        );
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setError(msg);
       setMessages((prev) =>

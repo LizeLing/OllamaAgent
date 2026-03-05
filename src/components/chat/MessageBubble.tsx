@@ -125,6 +125,15 @@ export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, 
           <MarkdownRenderer content={message.content} />
         )}
 
+        {!isUser && message.aborted && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            </svg>
+            <span>응답이 중단되었습니다</span>
+          </div>
+        )}
+
         {!isUser && message.error && (
           <div className="mt-2 p-2 bg-error/10 border border-error/30 rounded-lg">
             <div className="flex items-start gap-2">
