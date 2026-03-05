@@ -37,9 +37,12 @@ export interface AgentConfig {
   };
   enabledTools?: string[];
   fallbackModels?: string[];
+  activeSkill?: import('@/types/skills').AgentSkill;
+  nestingDepth?: number;
+  maxNestingDepth?: number;
 }
 
 export interface AgentEvent {
-  type: 'thinking' | 'tool_start' | 'tool_end' | 'tool_confirm' | 'token' | 'thinking_token' | 'image' | 'done' | 'error' | 'loop_detected' | 'model_fallback';
+  type: 'thinking' | 'tool_start' | 'tool_end' | 'tool_confirm' | 'token' | 'thinking_token' | 'image' | 'done' | 'error' | 'loop_detected' | 'model_fallback' | 'skill_start' | 'skill_step' | 'skill_end' | 'subagent_start' | 'subagent_event' | 'subagent_end';
   data: Record<string, unknown>;
 }

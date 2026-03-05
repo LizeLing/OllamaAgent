@@ -3,6 +3,7 @@ export interface ChatRequest {
   history: { role: 'user' | 'assistant'; content: string }[];
   images?: string[];
   model?: string;
+  skillId?: string;
 }
 
 export interface SSEEvent {

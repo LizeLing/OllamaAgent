@@ -18,6 +18,7 @@ export interface Message {
   aborted?: boolean;
   tokenUsage?: TokenUsage;
   model?: string;
+  skillProgress?: { current: number; total: number; skillName: string };
 }
 
 export interface ToolCallInfo {
@@ -28,6 +29,7 @@ export interface ToolCallInfo {
   success?: boolean;
   startTime: number;
   endTime?: number;
+  contentIndex?: number;
 }
 
 export interface ImageInfo {
