@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateFolder, deleteFolder } from '@/lib/conversations/folders';
+import { clearFolderFromConversations } from '@/lib/conversations/storage';
 
 export async function PUT(
   request: NextRequest,
@@ -24,6 +25,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
+    await clearFolderFromConversations(id);
     await deleteFolder(id);
     return NextResponse.json({ success: true });
   } catch {

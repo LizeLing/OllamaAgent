@@ -86,6 +86,32 @@ export async function deleteConversation(id: string): Promise<void> {
   await writeIndex(filtered);
 }
 
+export async function clearFolderFromConversations(folderId: string): Promise<void> {
+  const index = await readIndex();
+  let changed = false;
+
+  for (const meta of index) {
+    if (meta.folderId === folderId) {
+      meta.folderId = undefined;
+      changed = true;
+
+      try {
+        const filePath = path.join(CONVERSATIONS_DIR, `${meta.id}.json`);
+        const data = await fs.readFile(filePath, 'utf-8');
+        const conv = JSON.parse(data);
+        delete conv.folderId;
+        await fs.writeFile(filePath, JSON.stringify(conv, null, 2));
+      } catch {
+        // conversation file may not exist
+      }
+    }
+  }
+
+  if (changed) {
+    await writeIndex(index);
+  }
+}
+
 export async function searchConversations(query: string): Promise<ConversationMeta[]> {
   const index = await readIndex();
   const lowerQuery = query.toLowerCase();
