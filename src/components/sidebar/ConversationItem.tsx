@@ -28,6 +28,7 @@ interface ConversationItemProps {
   onRename: (id: string, title: string) => void;
   onTogglePin?: (id: string) => void;
   onMoveToFolder?: (convId: string, folderId: string | null) => void;
+  onUpdateTags?: (id: string, tags: string[]) => void;
   folders?: FolderMeta[];
 }
 
@@ -39,11 +40,14 @@ export default function ConversationItem({
   onRename,
   onTogglePin,
   onMoveToFolder,
+  onUpdateTags,
   folders,
 }: ConversationItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(conversation.title);
   const [showFolderMenu, setShowFolderMenu] = useState(false);
+  const [showTagEditor, setShowTagEditor] = useState(false);
+  const [tagInput, setTagInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -75,11 +79,12 @@ export default function ConversationItem({
 
   return (
     <div
-      className={`group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+      className={`group rounded-lg cursor-pointer transition-colors ${
         isActive ? 'bg-accent/20 text-foreground' : 'text-muted hover:bg-card hover:text-foreground'
       }`}
       onClick={() => !isEditing && onSelect(conversation.id)}
     >
+      <div className="flex items-center gap-2 px-3 py-2">
       {/* Pin indicator */}
       {conversation.pinned && (
         <span className="text-accent text-[10px] shrink-0" title="고정됨">
@@ -169,6 +174,18 @@ export default function ConversationItem({
               )}
             </div>
           )}
+          {onUpdateTags && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowTagEditor(!showTagEditor); }}
+              className="p-1 text-muted hover:text-foreground rounded transition-colors"
+              title="태그 편집"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
+              </svg>
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -196,6 +213,48 @@ export default function ConversationItem({
               <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
             </svg>
           </button>
+        </div>
+      )}
+      </div>
+
+      {showTagEditor && onUpdateTags && (
+        <div
+          className="mt-1 px-2 pb-1"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex flex-wrap gap-1 mb-1">
+            {(conversation.tags || []).map((tag) => (
+              <span key={tag} className="inline-flex items-center gap-0.5 text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">
+                {tag}
+                <button
+                  onClick={() => {
+                    const newTags = (conversation.tags || []).filter((t) => t !== tag);
+                    onUpdateTags(conversation.id, newTags);
+                  }}
+                  className="hover:text-error"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && tagInput.trim()) {
+                  const newTags = [...(conversation.tags || []), tagInput.trim()];
+                  onUpdateTags(conversation.id, [...new Set(newTags)]);
+                  setTagInput('');
+                }
+                if (e.key === 'Escape') setShowTagEditor(false);
+              }}
+              placeholder="태그 추가..."
+              className="flex-1 text-[10px] bg-background border border-border rounded px-1.5 py-0.5 outline-none focus:border-accent"
+              autoFocus
+            />
+          </div>
         </div>
       )}
     </div>
