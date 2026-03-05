@@ -135,7 +135,7 @@ export async function* runAgentLoop(
         type: 'tool_end',
         data: {
           tool: toolName,
-          output: observation.slice(0, 500),
+          output: observation.slice(0, 2000),
           success: result.success,
         },
       };
