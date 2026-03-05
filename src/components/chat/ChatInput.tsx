@@ -24,7 +24,8 @@ const processImage = async (file: File): Promise<string | null> => {
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, width, height);
         const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
         resolve(base64);
       };
