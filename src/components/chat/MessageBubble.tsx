@@ -191,6 +191,14 @@ export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, 
         {!isUser && message.content && (
           <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
             <span className="text-[10px] text-muted mr-1">{formatTime(message.timestamp)}</span>
+            {message.tokenUsage && (
+              <span className="text-[10px] text-muted ml-1" title={`프롬프트: ${message.tokenUsage.promptTokens} / 생성: ${message.tokenUsage.completionTokens}`}>
+                {message.tokenUsage.totalTokens.toLocaleString()}t
+              </span>
+            )}
+            {message.model && (
+              <span className="text-[10px] text-muted ml-1">{message.model.split(':')[0]}</span>
+            )}
             <AudioPlayer
               isSpeaking={isSpeaking}
               onSpeak={() => speak(message.content)}

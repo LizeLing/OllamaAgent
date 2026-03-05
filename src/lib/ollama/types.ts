@@ -58,6 +58,8 @@ export interface OllamaChatStreamChunk {
     thinking?: string;
   };
   done: boolean;
+  prompt_eval_count?: number;
+  eval_count?: number;
 }
 
 export interface OllamaGenerateRequest {

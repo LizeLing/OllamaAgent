@@ -52,6 +52,8 @@ export default function ChatContainer() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
   const [isDragOverPage, setIsDragOverPage] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const prevMessagesLenRef = useRef(0);
   const dragCounterRef = useRef(0);
 
@@ -69,6 +71,13 @@ export default function ChatContainer() {
       fetchConversations();
     }
   }, [isLoading, conversationId, messages, saveToServer, fetchConversations]);
+
+  useEffect(() => {
+    fetch('/api/models')
+      .then((r) => r.json())
+      .then((data) => setAvailableModels(data.models || []))
+      .catch(() => {});
+  }, []);
 
   const handleNewChat = useCallback(() => {
     clearMessages();
@@ -128,7 +137,7 @@ export default function ChatContainer() {
       setActiveId(newId);
     }
 
-    await sendMessage(content, images);
+    await sendMessage(content, images, selectedModel || undefined);
 
     if (messages.length === 0 && currentConvId) {
       setTimeout(async () => {
@@ -144,7 +153,7 @@ export default function ChatContainer() {
         }
       }, 2000);
     }
-  }, [conversationId, createConversation, setConversationId, setActiveId, sendMessage, messages.length, fetchConversations]);
+  }, [conversationId, createConversation, setConversationId, setActiveId, sendMessage, messages.length, fetchConversations, selectedModel]);
 
   // Branch conversation from a specific message
   const handleBranch = useCallback(async (messageId: string) => {
@@ -330,9 +339,20 @@ export default function ChatContainer() {
             </button>
             <span className="text-xl">🤖</span>
             <h1 className="text-base font-semibold">OllamaAgent</h1>
-            <span className="text-[10px] text-muted bg-card px-1.5 py-0.5 rounded">
-              {settings?.ollamaModel || 'loading...'}
-            </span>
+            <select
+              value={selectedModel || settings?.ollamaModel || ''}
+              onChange={(e) => setSelectedModel(e.target.value || null)}
+              className="text-[10px] text-muted bg-card px-1.5 py-0.5 rounded border-none outline-none cursor-pointer"
+              title="모델 선택"
+            >
+              {availableModels.length > 0 ? (
+                availableModels.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))
+              ) : (
+                <option value={settings?.ollamaModel || ''}>{settings?.ollamaModel || 'loading...'}</option>
+              )}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             {isLoading && (

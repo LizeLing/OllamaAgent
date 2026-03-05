@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: ChatRequest = await request.json();
+    const { model: requestModel } = body;
     const settings = await loadSettings();
 
     initializeTools(
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
           const agentLoop = runAgentLoop(
             {
               ollamaUrl: settings.ollamaUrl,
-              ollamaModel: settings.ollamaModel,
+              ollamaModel: requestModel || settings.ollamaModel,
               maxIterations: settings.maxIterations,
               systemPrompt: settings.systemPrompt,
               allowedPaths: settings.allowedPaths,

@@ -2,6 +2,7 @@ export interface ChatRequest {
   message: string;
   history: { role: 'user' | 'assistant'; content: string }[];
   images?: string[];
+  model?: string;
 }
 
 export interface SSEEvent {

@@ -53,6 +53,8 @@ export async function* runAgentLoop(
       // No tool call -> final answer. Use chatStream with think: true for thinking tokens.
       const thinkingStartTime = Date.now();
       let hasThinking = false;
+      let promptTokens = 0;
+      let completionTokens = 0;
 
       for await (const chunk of chatStream(config.ollamaUrl, {
         model: config.ollamaModel,
@@ -60,6 +62,10 @@ export async function* runAgentLoop(
         think: true,
         options: config.modelOptions,
       })) {
+        if (chunk.done) {
+          promptTokens = chunk.prompt_eval_count || 0;
+          completionTokens = chunk.eval_count || 0;
+        }
         if (chunk.message?.thinking) {
           hasThinking = true;
           yield { type: 'thinking_token', data: { content: chunk.message.thinking } };
@@ -74,7 +80,15 @@ export async function* runAgentLoop(
         yield { type: 'thinking_token', data: { done: true, duration: thinkingDuration } };
       }
 
-      yield { type: 'done', data: { iterations: iteration + 1 } };
+      yield { type: 'done', data: {
+        iterations: iteration + 1,
+        tokenUsage: {
+          promptTokens,
+          completionTokens,
+          totalTokens: promptTokens + completionTokens,
+        },
+        model: config.ollamaModel,
+      }};
       return;
     }
 
@@ -157,7 +171,7 @@ export async function* runAgentLoop(
     type: 'token',
     data: { content: '최대 반복 횟수에 도달했습니다. 작업을 완료하지 못했을 수 있습니다.' },
   };
-  yield { type: 'done', data: { iterations: config.maxIterations } };
+  yield { type: 'done', data: { iterations: config.maxIterations, model: config.ollamaModel } };
 }
 
 function splitIntoChunks(text: string, chunkSize: number): string[] {
