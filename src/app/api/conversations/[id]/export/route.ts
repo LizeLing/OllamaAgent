@@ -20,10 +20,11 @@ export async function GET(
         const role = msg.role === 'user' ? '사용자' : '어시스턴트';
         md += `**${role}**:\n${msg.content}\n\n---\n\n`;
       }
+      const safeTitle = conv.title.replace(/[^\w가-힣\s.-]/g, '_');
       return new Response(md, {
         headers: {
           'Content-Type': 'text/markdown; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${conv.title}.md"`,
+          'Content-Disposition': `attachment; filename="${safeTitle}.md"; filename*=UTF-8''${encodeURIComponent(conv.title)}.md`,
         },
       });
     }
