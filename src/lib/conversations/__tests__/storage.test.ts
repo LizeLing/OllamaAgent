@@ -1,49 +1,233 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock fs module
+const mockFs = {
+  mkdir: vi.fn().mockResolvedValue(undefined),
+  readFile: vi.fn(),
+  writeFile: vi.fn().mockResolvedValue(undefined),
+  unlink: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock('fs/promises', () => ({
-  default: {
-    mkdir: vi.fn().mockResolvedValue(undefined),
-    readFile: vi.fn().mockRejectedValue(new Error('not found')),
-    writeFile: vi.fn().mockResolvedValue(undefined),
-    unlink: vi.fn().mockResolvedValue(undefined),
-  },
+  default: mockFs,
 }));
 
 vi.mock('@/lib/config/constants', () => ({
   DATA_DIR: '/tmp/test-data',
 }));
 
-describe('storage ID validation', () => {
+describe('Conversation Storage', () => {
+  let listConversations: typeof import('../storage').listConversations;
   let getConversation: typeof import('../storage').getConversation;
+  let saveConversation: typeof import('../storage').saveConversation;
   let deleteConversation: typeof import('../storage').deleteConversation;
+  let searchConversations: typeof import('../storage').searchConversations;
+  let clearFolderFromConversations: typeof import('../storage').clearFolderFromConversations;
+  let readIndex: typeof import('../storage').readIndex;
+
   beforeEach(async () => {
     vi.resetModules();
+    vi.clearAllMocks();
+    mockFs.readFile.mockRejectedValue(new Error('not found'));
+    mockFs.writeFile.mockResolvedValue(undefined);
+    mockFs.mkdir.mockResolvedValue(undefined);
+    mockFs.unlink.mockResolvedValue(undefined);
+
     const mod = await import('../storage');
+    listConversations = mod.listConversations;
     getConversation = mod.getConversation;
+    saveConversation = mod.saveConversation;
     deleteConversation = mod.deleteConversation;
+    searchConversations = mod.searchConversations;
+    clearFolderFromConversations = mod.clearFolderFromConversations;
+    readIndex = mod.readIndex;
   });
 
-  it('rejects path traversal in getConversation', async () => {
-    const result = await getConversation('../../../etc/passwd');
-    expect(result).toBeNull(); // Should catch the validation error
+  describe('ID validation', () => {
+    it('getConversation에서 path traversal을 거부한다', async () => {
+      const result = await getConversation('../../../etc/passwd');
+      expect(result).toBeNull();
+    });
+
+    it('deleteConversation에서 path traversal을 안전하게 처리한다', async () => {
+      await expect(deleteConversation('../etc/passwd')).resolves.not.toThrow();
+    });
+
+    it('유효한 UUID ID를 허용한다', async () => {
+      const result = await getConversation('abc-123-def');
+      expect(result).toBeNull();
+    });
+
+    it('특수문자가 포함된 ID를 거부한다', async () => {
+      const result = await getConversation('id with spaces');
+      expect(result).toBeNull();
+    });
   });
 
-  it('rejects path traversal in deleteConversation', async () => {
-    // deleteConversation catches errors silently
-    await expect(async () => {
-      await deleteConversation('../etc/passwd');
-    }).not.toThrow(); // It catches internally
+  describe('listConversations', () => {
+    it('pinned 항목을 먼저, updatedAt 내림차순으로 정렬한다', async () => {
+      const index = [
+        { id: 'c1', title: 'Old', createdAt: 100, updatedAt: 100, messageCount: 1 },
+        { id: 'c2', title: 'New', createdAt: 200, updatedAt: 200, messageCount: 1 },
+        { id: 'c3', title: 'Pinned', createdAt: 50, updatedAt: 50, messageCount: 1, pinned: true },
+      ];
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+
+      const result = await listConversations();
+
+      expect(result[0].id).toBe('c3'); // pinned first
+      expect(result[1].id).toBe('c2'); // newer
+      expect(result[2].id).toBe('c1'); // older
+    });
   });
 
-  it('accepts valid UUID-like IDs', async () => {
-    // This will return null because the file doesn't exist (mocked)
-    const result = await getConversation('abc-123-def');
-    expect(result).toBeNull(); // null from file not found, not from validation
+  describe('saveConversation', () => {
+    it('파일을 생성하고 인덱스를 업데이트한다', async () => {
+      // readIndex returns empty
+      mockFs.readFile.mockRejectedValueOnce(new Error('not found'));
+
+      await saveConversation({
+        id: 'conv-1',
+        title: 'Test',
+        createdAt: 1000,
+        updatedAt: 1000,
+        messageCount: 2,
+        messages: [
+          { id: 'm1', role: 'user', content: 'hi', timestamp: 1000 },
+          { id: 'm2', role: 'assistant', content: 'hello', timestamp: 1001 },
+        ],
+      });
+
+      // Should write conversation file
+      expect(mockFs.writeFile).toHaveBeenCalledWith(
+        expect.stringContaining('conv-1.json'),
+        expect.any(String)
+      );
+      // Should write index
+      expect(mockFs.writeFile).toHaveBeenCalledTimes(2);
+    });
+
+    it('기존 항목을 업데이트한다', async () => {
+      const existingIndex = [
+        { id: 'conv-1', title: 'Old Title', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
+      ];
+      // First readFile for readIndex
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(existingIndex));
+
+      await saveConversation({
+        id: 'conv-1',
+        title: 'New Title',
+        createdAt: 1000,
+        updatedAt: 2000,
+        messageCount: 3,
+        messages: [
+          { id: 'm1', role: 'user', content: 'hi', timestamp: 1000 },
+          { id: 'm2', role: 'assistant', content: 'hello', timestamp: 1001 },
+          { id: 'm3', role: 'user', content: 'bye', timestamp: 1002 },
+        ],
+      });
+
+      // The index write should contain updated title
+      const indexWriteCall = mockFs.writeFile.mock.calls.find(
+        (call: string[]) => call[0].includes('index.json')
+      );
+      const writtenIndex = JSON.parse(indexWriteCall![1] as string);
+      expect(writtenIndex[0].title).toBe('New Title');
+      expect(writtenIndex).toHaveLength(1);
+    });
   });
 
-  it('rejects IDs with special characters', async () => {
-    const result = await getConversation('id with spaces');
-    expect(result).toBeNull();
+  describe('deleteConversation', () => {
+    it('파일과 인덱스 항목을 제거한다', async () => {
+      const index = [
+        { id: 'conv-1', title: 'Test', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
+        { id: 'conv-2', title: 'Keep', createdAt: 2000, updatedAt: 2000, messageCount: 1 },
+      ];
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+
+      await deleteConversation('conv-1');
+
+      expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('conv-1.json'));
+      const indexWriteCall = mockFs.writeFile.mock.calls.find(
+        (call: string[]) => call[0].includes('index.json')
+      );
+      const writtenIndex = JSON.parse(indexWriteCall![1] as string);
+      expect(writtenIndex).toHaveLength(1);
+      expect(writtenIndex[0].id).toBe('conv-2');
+    });
+  });
+
+  describe('searchConversations', () => {
+    it('제목 일치를 찾는다', async () => {
+      const index = [
+        { id: 'c1', title: 'React Tutorial', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
+        { id: 'c2', title: 'Vue Guide', createdAt: 2000, updatedAt: 2000, messageCount: 1 },
+      ];
+      // readIndex call
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+
+      const results = await searchConversations('react');
+
+      expect(results).toHaveLength(1);
+      expect(results[0].matchType).toBe('title');
+      expect(results[0].id).toBe('c1');
+    });
+
+    it('내용 일치 시 snippet을 반환한다', async () => {
+      const index = [
+        { id: 'c1', title: 'Chat', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
+      ];
+      const conversation = {
+        id: 'c1',
+        title: 'Chat',
+        createdAt: 1000,
+        updatedAt: 1000,
+        messageCount: 1,
+        messages: [{ id: 'm1', role: 'user', content: 'How to use TypeScript generics?', timestamp: 1000 }],
+      };
+      // readIndex for search
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+      // getConversation for content search
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(conversation));
+
+      const results = await searchConversations('typescript');
+
+      expect(results).toHaveLength(1);
+      expect(results[0].matchType).toBe('content');
+      expect(results[0].matchedSnippet).toBeDefined();
+    });
+  });
+
+  describe('clearFolderFromConversations', () => {
+    it('일치하는 대화에서 folderId를 제거한다', async () => {
+      const index = [
+        { id: 'c1', title: 'A', createdAt: 1000, updatedAt: 1000, messageCount: 1, folderId: 'f1' },
+        { id: 'c2', title: 'B', createdAt: 2000, updatedAt: 2000, messageCount: 1, folderId: 'f2' },
+      ];
+      const conv1 = { id: 'c1', title: 'A', folderId: 'f1', messages: [] };
+      // readIndex
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+      // readFile for conversation c1
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(conv1));
+
+      await clearFolderFromConversations('f1');
+
+      // Should write updated conversation file
+      const convWriteCall = mockFs.writeFile.mock.calls.find(
+        (call: string[]) => call[0].includes('c1.json')
+      );
+      expect(convWriteCall).toBeDefined();
+      const written = JSON.parse(convWriteCall![1] as string);
+      expect(written.folderId).toBeUndefined();
+    });
+  });
+
+  describe('corrupted index', () => {
+    it('손상된 인덱스 파일에서 빈 배열을 반환한다', async () => {
+      mockFs.readFile.mockResolvedValueOnce('invalid json{{{');
+
+      const result = await listConversations();
+      expect(result).toEqual([]);
+    });
   });
 });

@@ -4,16 +4,43 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    globals: true,
-    css: false,
-    include: ['src/**/*.test.{ts,tsx}'],
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  test: {
+    globals: true,
+    css: false,
+    projects: [
+      {
+        test: {
+          name: 'unit',
+          environment: 'jsdom',
+          setupFiles: ['./src/test/setup.ts'],
+          include: ['src/**/*.test.{ts,tsx}'],
+          exclude: ['src/**/*.integration.test.*'],
+        },
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+          },
+        },
+      },
+      {
+        test: {
+          name: 'integration',
+          environment: 'node',
+          setupFiles: ['./src/test/setup-integration.ts'],
+          include: ['src/**/*.integration.test.{ts,tsx}'],
+          testTimeout: 60000,
+        },
+        resolve: {
+          alias: {
+            '@': path.resolve(__dirname, './src'),
+          },
+        },
+      },
+    ],
   },
 });
