@@ -121,7 +121,7 @@ export function useChat() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: m.content || `오류가 발생했습니다: ${msg}` }
+            ? { ...m, error: msg }
             : m
         )
       );
@@ -194,7 +194,7 @@ export function useChat() {
             case 'error':
               return {
                 ...m,
-                content: m.content || `오류: ${data.message as string}`,
+                error: data.message as string,
               };
 
             default:
