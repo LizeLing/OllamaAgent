@@ -14,6 +14,7 @@ import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
 import ShortcutGuide from '@/components/ui/ShortcutGuide';
 import StatsPanel from '@/components/ui/StatsPanel';
 import ToolLogPanel from '@/components/ui/ToolLogPanel';
+import { COMMANDS } from '@/lib/commands/definitions';
 
 export default function ChatContainer() {
   const {
@@ -24,6 +25,7 @@ export default function ChatContainer() {
     regenerate,
     stopGeneration,
     clearMessages,
+    addSystemMessage,
     conversationId,
     setConversationId,
     loadConversation,
@@ -51,12 +53,12 @@ export default function ChatContainer() {
     renameFolder,
   } = useConversations();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(min-width: 768px)').matches;
-    }
-    return false;
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Set initial sidebar state based on screen size after hydration
+  useEffect(() => {
+    setSidebarOpen(window.matchMedia('(min-width: 768px)').matches);
+  }, []);
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [toolLogOpen, setToolLogOpen] = useState(false);
@@ -231,6 +233,66 @@ export default function ChatContainer() {
       addToast('error', '내보내기에 실패했습니다.');
     }
   }, []);
+
+  const handleCommand = useCallback((name: string, args: string[]) => {
+    switch (name) {
+      case 'new':
+        handleNewChat();
+        break;
+      case 'clear':
+        clearMessages();
+        addSystemMessage('대화가 초기화되었습니다.');
+        break;
+      case 'model':
+        if (args[0]) {
+          setSelectedModel(args[0]);
+          addSystemMessage(`모델이 ${args[0]}으로 변경되었습니다.`);
+        } else {
+          addSystemMessage(`현재 모델: ${selectedModel || settings?.ollamaModel || '없음'}\n사용 가능: ${availableModels.join(', ')}`);
+        }
+        break;
+      case 'help': {
+        const helpText = COMMANDS.map(
+          (c) => `**/${c.name}** — ${c.description}`
+        ).join('\n');
+        addSystemMessage(`## 명령어 목록\n\n${helpText}`);
+        break;
+      }
+      case 'stats': {
+        const totalTokens = messages.reduce(
+          (sum, m) => sum + (m.tokenUsage?.totalTokens || 0), 0
+        );
+        addSystemMessage(
+          `## 세션 통계\n\n` +
+          `- 메시지 수: ${messages.length}\n` +
+          `- 총 토큰: ${totalTokens}\n` +
+          `- 모델: ${selectedModel || settings?.ollamaModel || '없음'}\n` +
+          `- 대화 ID: ${conversationId || '없음'}`
+        );
+        break;
+      }
+      case 'export':
+        if (activeId) {
+          handleExport(activeId, (args[0] as 'json' | 'markdown') || 'json');
+        } else {
+          addSystemMessage('내보낼 대화가 없습니다.');
+        }
+        break;
+      case 'system':
+        if (args[0]) {
+          fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ systemPrompt: args[0] }),
+          }).then(() => {
+            addSystemMessage(`시스템 프롬프트가 변경되었습니다.`);
+          }).catch(() => {
+            addSystemMessage('시스템 프롬프트 변경에 실패했습니다.');
+          });
+        }
+        break;
+    }
+  }, [handleNewChat, clearMessages, addSystemMessage, selectedModel, settings, availableModels, messages, conversationId, activeId, handleExport]);
 
   const handleImport = useCallback(() => {
     fetchConversations();
@@ -428,7 +490,7 @@ export default function ChatContainer() {
         />
 
         {/* Input */}
-        <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} disabled={isLoading} onDrop={handleFileDrop} />
+        <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} onCommand={handleCommand} disabled={isLoading} onDrop={handleFileDrop} />
       </main>
 
       {/* Settings */}

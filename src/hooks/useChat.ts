@@ -290,6 +290,16 @@ export function useChat() {
     setError(null);
   }, []);
 
+  const addSystemMessage = useCallback((content: string) => {
+    const msg: Message = {
+      id: uuidv4(),
+      role: 'system',
+      content,
+      timestamp: Date.now(),
+    };
+    setMessages((prev) => [...prev, msg]);
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -302,6 +312,7 @@ export function useChat() {
     regenerate,
     stopGeneration,
     clearMessages,
+    addSystemMessage,
     loadConversation,
     saveToServer,
     pendingApproval,
