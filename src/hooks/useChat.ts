@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Message, ToolCallInfo, ImageInfo } from '@/types/message';
 import { v4 as uuidv4 } from 'uuid';
+import { addToast } from '@/hooks/useToast';
 
 interface PendingApproval {
   toolName: string;
@@ -84,7 +85,13 @@ export function useChat() {
         signal: abortController.signal,
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        if (response.status === 429) {
+          addToast('warning', '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+          throw new Error('Rate limited');
+        }
+        throw new Error(`HTTP ${response.status}`);
+      }
       if (!response.body) throw new Error('No response body');
 
       const reader = response.body.getReader();
@@ -126,6 +133,7 @@ export function useChat() {
       }
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setError(msg);
+      addToast('error', msg);
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId

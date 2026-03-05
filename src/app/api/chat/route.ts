@@ -6,9 +6,19 @@ import { runAgentLoop } from '@/lib/agent/agent-loop';
 import { initializeTools, registerCustomTools, registerMcpTools } from '@/lib/tools/init';
 import { MemoryManager } from '@/lib/memory/memory-manager';
 import { waitForApproval } from '@/lib/agent/approval';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/middleware/rate-limiter';
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
+
+    // Rate limiting
+    const clientIP = request.headers.get('x-forwarded-for') || 'unknown';
+    if (!checkRateLimit(`chat:${clientIP}`, RATE_LIMITS.chat)) {
+      return new Response(
+        JSON.stringify({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
   try {
     const body: ChatRequest = await request.json();
