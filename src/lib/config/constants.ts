@@ -25,4 +25,5 @@ export const DEFAULT_SETTINGS: Settings = {
     topP: 0.9,
     numPredict: 2048,
   },
+  enabledTools: [],
 };

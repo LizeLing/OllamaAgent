@@ -53,4 +53,5 @@ export interface Settings {
   customTools: CustomToolDef[];
   mcpServers: McpServerConfig[];
   modelOptions: ModelOptions;
+  enabledTools?: string[];
 }

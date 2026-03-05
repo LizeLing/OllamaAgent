@@ -25,6 +25,7 @@ export default function PresetSelector({ activePresetId, onSelect }: PresetSelec
       onSelect({
         activePresetId: preset.id,
         systemPrompt: preset.systemPrompt,
+        enabledTools: preset.enabledTools,
       });
     }
   };
