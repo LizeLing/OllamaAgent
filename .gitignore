@@ -41,6 +41,8 @@ yarn-error.log*
 /data/uploads/
 /data/generated/
 /data/settings.json
+/data/conversations/
+/data/folders.json
 
 # worktrees
 .worktrees/
