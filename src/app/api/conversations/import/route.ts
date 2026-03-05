@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
     // Validate and sanitize messages
     const rawMessages = Array.isArray(body.messages) ? body.messages : [];
     const messages = rawMessages
-      .map(sanitizeMessage)
-      .filter((m): m is NonNullable<typeof m> => m !== null)
+      .map((m: unknown) => sanitizeMessage(m))
+      .filter((m: ReturnType<typeof sanitizeMessage>): m is NonNullable<ReturnType<typeof sanitizeMessage>> => m !== null)
       .slice(0, 1000); // Max 1000 messages
 
     const conv: Conversation = {

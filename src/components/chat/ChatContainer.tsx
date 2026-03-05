@@ -65,6 +65,12 @@ export default function ChatContainer() {
     }
   }, [isLoading, conversationId, messages, saveToServer, fetchConversations]);
 
+  const handleNewChat = useCallback(() => {
+    clearMessages();
+    setActiveId(null);
+    prevMessagesLenRef.current = 0;
+  }, [clearMessages, setActiveId]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -83,12 +89,6 @@ export default function ChatContainer() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isLoading, stopGeneration, handleNewChat]);
-
-  const handleNewChat = useCallback(() => {
-    clearMessages();
-    setActiveId(null);
-    prevMessagesLenRef.current = 0;
-  }, [clearMessages, setActiveId]);
 
   const handleSelectConversation = useCallback(async (id: string) => {
     setActiveId(id);
