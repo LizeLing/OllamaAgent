@@ -25,6 +25,17 @@ export function useSettings() {
     fetchSettings();
   }, [fetchSettings]);
 
+  // 탭 복귀 시 설정 재로드
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSettings();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [fetchSettings]);
+
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {
     try {
       const res = await fetch('/api/settings', {
