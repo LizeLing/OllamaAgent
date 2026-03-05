@@ -3,7 +3,6 @@
 import { Settings } from '@/types/settings';
 import CustomToolEditor from '../CustomToolEditor';
 import McpServerManager from '../McpServerManager';
-import SkillEditor from '../SkillEditor';
 import HelpTooltip from '@/components/ui/HelpTooltip';
 
 interface ExtensionsTabProps {
@@ -16,8 +15,6 @@ const HELP = {
     '외부 HTTP API를 도구로 등록하여 에이전트가 호출할 수 있게 합니다.',
   mcpServers:
     'MCP 서버를 연결하여 에이전트의 기능을 확장합니다.',
-  skills:
-    '다단계 워크플로우를 정의하여 에이전트가 복잡한 작업을 수행하도록 합니다.',
   subagent:
     '메인 에이전트가 전문 하위 에이전트에게 작업을 위임합니다.',
 };
@@ -49,17 +46,6 @@ export default function ExtensionsTab({ draft, onDraftChange }: ExtensionsTabPro
           servers={draft.mcpServers || []}
           onChange={(servers) => onDraftChange({ mcpServers: servers })}
         />
-      </section>
-
-      <hr className="border-border" />
-
-      {/* Skills */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-foreground">스킬</h3>
-          <HelpTooltip text={HELP.skills} />
-        </div>
-        <SkillEditor />
       </section>
 
       <hr className="border-border" />
