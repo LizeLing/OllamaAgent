@@ -294,8 +294,43 @@ export default function ChatContainer() {
           });
         }
         break;
+      case 'skill':
+        if (args[0]) {
+          // 스킬 이름으로 실행
+          fetch('/api/skills')
+            .then((r) => r.json())
+            .then((skills: Array<{ id: string; name: string; triggerCommand?: string; icon?: string; description: string }>) => {
+              const skill = skills.find(
+                (s) => s.triggerCommand === args[0] || s.name === args[0] || s.id === args[0]
+              );
+              if (skill) {
+                addSystemMessage(`스킬 "${skill.icon || '📋'} ${skill.name}" 실행 중...`);
+                // skillId를 포함하여 메시지 전송 - sendMessage에 skillId 전달은 직접 fetch로 처리
+                handleSend(`[스킬 실행: ${skill.name}] ${args.slice(1).join(' ') || skill.description}`);
+              } else {
+                addSystemMessage(`스킬 "${args[0]}"을 찾을 수 없습니다.`);
+              }
+            })
+            .catch(() => addSystemMessage('스킬 목록을 불러올 수 없습니다.'));
+        } else {
+          // 스킬 목록 표시
+          fetch('/api/skills')
+            .then((r) => r.json())
+            .then((skills: Array<{ icon?: string; name: string; triggerCommand?: string; description: string; workflow: unknown[] }>) => {
+              if (skills.length === 0) {
+                addSystemMessage('등록된 스킬이 없습니다.');
+              } else {
+                const list = skills.map(
+                  (s) => `- ${s.icon || '📋'} **${s.name}**${s.triggerCommand ? ` (\`/skill ${s.triggerCommand}\`)` : ''} — ${s.description} (${s.workflow.length}단계)`
+                ).join('\n');
+                addSystemMessage(`## 사용 가능한 스킬\n\n${list}\n\n실행: \`/skill <이름>\``);
+              }
+            })
+            .catch(() => addSystemMessage('스킬 목록을 불러올 수 없습니다.'));
+        }
+        break;
     }
-  }, [handleNewChat, clearMessages, addSystemMessage, selectedModel, settings, availableModels, messages, conversationId, activeId, handleExport]);
+  }, [handleNewChat, clearMessages, addSystemMessage, selectedModel, settings, availableModels, messages, conversationId, activeId, handleExport, handleSend]);
 
   const handleImport = useCallback(() => {
     fetchConversations();
@@ -361,8 +396,8 @@ export default function ChatContainer() {
         conversations={conversations}
         folders={folders}
         activeId={activeId}
-        onSelect={handleSelectConversation}
-        onNew={handleNewChat}
+        onSelect={(id) => { setSettingsOpen(false); handleSelectConversation(id); }}
+        onNew={() => { setSettingsOpen(false); handleNewChat(); }}
         onDelete={handleDeleteConversation}
         onRename={renameConversation}
         onSearch={search}
@@ -377,6 +412,8 @@ export default function ChatContainer() {
         onDeleteFolder={deleteFolderFn}
         onRenameFolder={renameFolder}
         onUpdateTags={updateTags}
+        settingsOpen={settingsOpen}
+        onSettingsOpen={() => setSettingsOpen(true)}
       />
 
       <main className="flex-1 flex flex-col min-w-0 relative">
@@ -469,40 +506,32 @@ export default function ChatContainer() {
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
             </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
-              title="Settings (Cmd+,)"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-              </svg>
-            </button>
           </div>
         </header>
 
-        {/* Messages */}
-        <MessageList
-          messages={messages}
-          isLoading={isLoading}
-          onEdit={editMessage}
-          onRegenerate={regenerate}
-          onSend={(msg) => handleSend(msg)}
-          onBranch={handleBranch}
-        />
+        {settingsOpen ? (
+          <SettingsPanel
+            onClose={() => setSettingsOpen(false)}
+            settings={settings}
+            onSave={updateSettings}
+          />
+        ) : (
+          <>
+            {/* Messages */}
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              onEdit={editMessage}
+              onRegenerate={regenerate}
+              onSend={(msg) => handleSend(msg)}
+              onBranch={handleBranch}
+            />
 
-        {/* Input */}
-        <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} onCommand={handleCommand} disabled={isLoading} onDrop={handleFileDrop} />
+            {/* Input */}
+            <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} onCommand={handleCommand} disabled={isLoading} onDrop={handleFileDrop} />
+          </>
+        )}
       </main>
-
-      {/* Settings */}
-      <SettingsPanel
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        onSave={updateSettings}
-      />
 
       {/* Tool Approval Modal */}
       {pendingApproval && (

@@ -70,6 +70,7 @@ export function useChat() {
                 tool: data.tool as string,
                 input: data.input as Record<string, unknown>,
                 startTime: Date.now(),
+                contentIndex: m.content.length,
               };
               return { ...m, toolCalls: [...(m.toolCalls || []), tc] };
             }
@@ -110,6 +111,40 @@ export function useChat() {
 
             case 'model_fallback':
               addToast('info', `모델이 ${data.originalModel}에서 ${data.usedModel}으로 전환되었습니다.`);
+              return m;
+
+            case 'skill_start':
+              return {
+                ...m,
+                skillProgress: {
+                  current: 0,
+                  total: data.totalSteps as number,
+                  skillName: data.skillName as string,
+                },
+              };
+
+            case 'skill_step':
+              return {
+                ...m,
+                skillProgress: {
+                  current: data.step as number,
+                  total: data.total as number,
+                  skillName: m.skillProgress?.skillName || '',
+                },
+              };
+
+            case 'skill_end':
+              return m;
+
+            case 'subagent_start':
+              addToast('info', `서브에이전트(${data.agentType}) 작업 시작`);
+              return m;
+
+            case 'subagent_event':
+              return m;
+
+            case 'subagent_end':
+              addToast('info', `서브에이전트(${data.agentType}) 작업 완료`);
               return m;
 
             case 'done': {
