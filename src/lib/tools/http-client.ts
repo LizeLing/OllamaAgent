@@ -20,16 +20,27 @@ export class HttpClientTool extends BaseTool {
     // SSRF prevention: block internal/private URLs
     try {
       const parsed = new URL(url);
-      const hostname = parsed.hostname.toLowerCase();
-      const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '169.254.169.254'];
+      const hostname = parsed.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+      const blockedHosts = ['localhost', '0.0.0.0', '::1', '::'];
       if (blockedHosts.includes(hostname) || hostname.endsWith('.local') || hostname.endsWith('.internal')) {
         return this.error('내부 네트워크 URL에는 접근할 수 없습니다.');
       }
-      // Block private IP ranges
+      // Block IPv4-mapped IPv6 (e.g., ::ffff:127.0.0.1)
+      if (hostname.startsWith('::ffff:')) {
+        return this.error('내부 네트워크 URL에는 접근할 수 없습니다.');
+      }
+      // Block private/special IPv4 ranges
       const ipMatch = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
       if (ipMatch) {
         const [, a, b] = ipMatch.map(Number);
-        if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+        if (
+          a === 0 ||                                          // 0.0.0.0/8
+          a === 10 ||                                         // 10.0.0.0/8
+          a === 127 ||                                        // 127.0.0.0/8 (loopback)
+          (a === 169 && b === 254) ||                         // 169.254.0.0/16 (link-local)
+          (a === 172 && b >= 16 && b <= 31) ||                // 172.16.0.0/12
+          (a === 192 && b === 168)                            // 192.168.0.0/16
+        ) {
           return this.error('사설 IP 대역에는 접근할 수 없습니다.');
         }
       }

@@ -22,6 +22,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: ChatRequest = await request.json();
+    if (!body.message || typeof body.message !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'message is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    if (!Array.isArray(body.history)) {
+      body.history = [];
+    }
     const { model: requestModel } = body;
     const settings = await loadSettings();
 

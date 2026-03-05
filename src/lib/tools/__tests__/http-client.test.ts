@@ -16,7 +16,7 @@ describe('HttpClientTool SSRF prevention', () => {
   it('blocks 127.0.0.1', async () => {
     const result = await tool.execute({ url: 'http://127.0.0.1/admin' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('내부 네트워크');
+    expect(result.output).toContain('사설 IP');
   });
 
   it('blocks private IP 192.168.x.x', async () => {
@@ -34,7 +34,7 @@ describe('HttpClientTool SSRF prevention', () => {
   it('blocks metadata service', async () => {
     const result = await tool.execute({ url: 'http://169.254.169.254/latest/meta-data/' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('내부 네트워크');
+    expect(result.output).toContain('사설 IP');
   });
 
   it('blocks non-HTTP protocols', async () => {
