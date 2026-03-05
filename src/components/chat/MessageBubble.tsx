@@ -50,6 +50,18 @@ interface MessageBubbleProps {
   isLast?: boolean;
 }
 
+function formatTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  const time = date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return time;
+
+  const dateStr = date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  return `${dateStr} ${time}`;
+}
+
 export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, isLast }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { isSpeaking, speak, stopSpeaking } = useVoice();
@@ -164,6 +176,7 @@ export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, 
         {/* Action buttons for user messages (edit) */}
         {isUser && !isEditing && (
           <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+            <span className="text-[10px] text-white/40">{formatTime(message.timestamp)}</span>
             <button onClick={() => { setEditContent(message.content); setIsEditing(true); }} className="p-1 text-white/60 hover:text-white" title="편집">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -176,6 +189,7 @@ export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, 
         {/* TTS + regenerate button for assistant messages */}
         {!isUser && message.content && (
           <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+            <span className="text-[10px] text-muted mr-1">{formatTime(message.timestamp)}</span>
             <AudioPlayer
               isSpeaking={isSpeaking}
               onSpeak={() => speak(message.content)}
