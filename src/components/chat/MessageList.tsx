@@ -36,6 +36,7 @@ export default function MessageList({ messages, isLoading, onEdit, onRegenerate 
             message={message}
             onEdit={onEdit}
             onRegenerate={onRegenerate}
+            onRetry={onRegenerate}
             isLast={idx === messages.length - 1}
           />
         ))}

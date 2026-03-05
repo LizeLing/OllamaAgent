@@ -46,10 +46,11 @@ interface MessageBubbleProps {
   message: Message;
   onEdit?: (id: string, content: string) => void;
   onRegenerate?: () => void;
+  onRetry?: () => void;
   isLast?: boolean;
 }
 
-export default function MessageBubble({ message, onEdit, onRegenerate, isLast }: MessageBubbleProps) {
+export default function MessageBubble({ message, onEdit, onRegenerate, onRetry, isLast }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { isSpeaking, speak, stopSpeaking } = useVoice();
   const [isEditing, setIsEditing] = useState(false);
@@ -122,6 +123,25 @@ export default function MessageBubble({ message, onEdit, onRegenerate, isLast }:
           )
         ) : (
           <MarkdownRenderer content={message.content} />
+        )}
+
+        {!isUser && message.error && (
+          <div className="mt-2 p-2 bg-error/10 border border-error/30 rounded-lg">
+            <div className="flex items-start gap-2">
+              <span className="text-error text-sm shrink-0">&#x26A0;</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-error">{message.error}</p>
+              </div>
+            </div>
+            {isLast && onRetry && (
+              <button
+                onClick={onRetry}
+                className="mt-1.5 px-3 py-1 text-xs bg-error/20 text-error rounded hover:bg-error/30 transition-colors"
+              >
+                재시도
+              </button>
+            )}
+          </div>
         )}
 
         {!isUser && message.images && message.images.length > 0 && (
