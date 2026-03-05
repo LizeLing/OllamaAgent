@@ -82,7 +82,7 @@ export default function ChatContainer() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isLoading, stopGeneration]);
+  }, [isLoading, stopGeneration, handleNewChat]);
 
   const handleNewChat = useCallback(() => {
     clearMessages();
