@@ -36,6 +36,7 @@ export interface AgentConfig {
     num_predict?: number;
   };
   enabledTools?: string[];
+  fallbackModels?: string[];
 }
 
 export interface AgentEvent {

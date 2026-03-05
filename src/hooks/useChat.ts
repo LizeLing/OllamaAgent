@@ -108,6 +108,10 @@ export function useChat() {
               addToast('warning', data.message as string);
               return m;
 
+            case 'model_fallback':
+              addToast('info', `모델이 ${data.originalModel}에서 ${data.usedModel}으로 전환되었습니다.`);
+              return m;
+
             case 'done': {
               const updates: Partial<Message> = {};
               if (data.tokenUsage) {

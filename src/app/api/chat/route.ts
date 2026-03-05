@@ -83,6 +83,7 @@ export async function POST(request: NextRequest) {
                 num_predict: settings.modelOptions.numPredict,
               } : undefined,
               enabledTools: settings.enabledTools?.length ? settings.enabledTools : undefined,
+              fallbackModels: settings.fallbackModels || [],
               onToolApproval: settings.toolApprovalMode !== 'auto'
                 ? (_toolName: string, _args: Record<string, unknown>, confirmId: string) => {
                     return waitForApproval(confirmId);

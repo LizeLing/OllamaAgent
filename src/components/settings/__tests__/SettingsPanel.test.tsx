@@ -27,6 +27,7 @@ const settings: Settings = {
   customTools: [],
   mcpServers: [],
   modelOptions: { temperature: 0.7, topP: 0.9, numPredict: 2048 },
+  fallbackModels: [],
 };
 
 beforeEach(() => {

@@ -1,6 +1,7 @@
 import { AgentConfig, AgentEvent } from './types';
 import { toolRegistry } from '@/lib/tools/registry';
-import { chat, chatStream } from '@/lib/ollama/client';
+import { chat as rawChat, chatStream } from '@/lib/ollama/client';
+import { chatWithFailover } from '@/lib/ollama/failover';
 import { OllamaChatMessage } from '@/lib/ollama/types';
 import { ToolCallTracker } from './tool-call-tracker';
 
@@ -34,19 +35,22 @@ export async function* runAgentLoop(
 
   const tools = toolRegistry.toOllamaTools(config.enabledTools);
   const tracker = new ToolCallTracker();
+  let activeModel = config.ollamaModel;
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     yield { type: 'thinking', data: { iteration } };
 
     // Non-streaming call to check for tool use (think: false for speed)
-    const response = await chat(config.ollamaUrl, {
-      model: config.ollamaModel,
-      messages,
-      stream: false,
-      think: false,
-      tools,
-      options: config.modelOptions,
-    });
+    const { result: response, usedModel, failedModels } = await chatWithFailover(
+      rawChat, config.ollamaUrl,
+      { model: activeModel, messages, stream: false, think: false, tools, options: config.modelOptions },
+      config.fallbackModels || []
+    );
+
+    if (failedModels.length > 0) {
+      yield { type: 'model_fallback', data: { originalModel: activeModel, usedModel, reason: `모델 ${failedModels.join(', ')} 사용 불가` } };
+      activeModel = usedModel;
+    }
 
     const assistantMsg = response.message;
     const toolCalls = assistantMsg.tool_calls;
@@ -59,7 +63,7 @@ export async function* runAgentLoop(
       let completionTokens = 0;
 
       for await (const chunk of chatStream(config.ollamaUrl, {
-        model: config.ollamaModel,
+        model: activeModel,
         messages,
         think: true,
         options: config.modelOptions,
@@ -89,7 +93,7 @@ export async function* runAgentLoop(
           completionTokens,
           totalTokens: promptTokens + completionTokens,
         },
-        model: config.ollamaModel,
+        model: activeModel,
       }};
       return;
     }
@@ -219,7 +223,7 @@ export async function* runAgentLoop(
     type: 'token',
     data: { content: '최대 반복 횟수에 도달했습니다. 작업을 완료하지 못했을 수 있습니다.' },
   };
-  yield { type: 'done', data: { iterations: config.maxIterations, model: config.ollamaModel } };
+  yield { type: 'done', data: { iterations: config.maxIterations, model: activeModel } };
 }
 
 function splitIntoChunks(text: string, chunkSize: number): string[] {

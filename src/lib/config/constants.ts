@@ -26,4 +26,5 @@ export const DEFAULT_SETTINGS: Settings = {
     numPredict: 2048,
   },
   enabledTools: [],
+  fallbackModels: [],
 };

@@ -54,4 +54,5 @@ export interface Settings {
   mcpServers: McpServerConfig[];
   modelOptions: ModelOptions;
   enabledTools?: string[];
+  fallbackModels: string[];
 }
