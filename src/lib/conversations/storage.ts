@@ -123,32 +123,47 @@ export async function clearFolderFromConversations(folderId: string): Promise<vo
   }
 }
 
-export async function searchConversations(query: string): Promise<ConversationMeta[]> {
+export interface SearchResult extends ConversationMeta {
+  matchedSnippet?: string;
+  matchType: 'title' | 'content';
+}
+
+export async function searchConversations(query: string): Promise<SearchResult[]> {
   const index = await readIndex();
   const lowerQuery = query.toLowerCase();
 
-  // First: search titles
-  const titleMatches = index.filter((c) =>
-    c.title.toLowerCase().includes(lowerQuery)
-  );
+  const results: SearchResult[] = [];
 
-  // Then: search message content for non-title-matched conversations
-  const titleMatchIds = new Set(titleMatches.map((c) => c.id));
-  const contentMatches: ConversationMeta[] = [];
-
+  // Title matches
   for (const meta of index) {
-    if (titleMatchIds.has(meta.id)) continue;
-    const conv = await getConversation(meta.id);
-    if (!conv) continue;
-    const hasMatch = conv.messages.some((m) =>
-      m.content.toLowerCase().includes(lowerQuery)
-    );
-    if (hasMatch) {
-      contentMatches.push(meta);
+    if (meta.title.toLowerCase().includes(lowerQuery)) {
+      results.push({ ...meta, matchType: 'title' });
     }
   }
 
-  return [...titleMatches, ...contentMatches].sort(
-    (a, b) => b.updatedAt - a.updatedAt
-  );
+  // Content matches (skip already matched by title)
+  const titleMatchIds = new Set(results.map((r) => r.id));
+  for (const meta of index) {
+    if (titleMatchIds.has(meta.id)) continue;
+    try {
+      const conv = await getConversation(meta.id);
+      if (!conv) continue;
+      for (const msg of conv.messages) {
+        const idx = msg.content.toLowerCase().indexOf(lowerQuery);
+        if (idx !== -1) {
+          const start = Math.max(0, idx - 30);
+          const end = Math.min(msg.content.length, idx + query.length + 50);
+          const snippet = (start > 0 ? '...' : '') +
+            msg.content.slice(start, end) +
+            (end < msg.content.length ? '...' : '');
+          results.push({ ...meta, matchType: 'content', matchedSnippet: snippet });
+          break;
+        }
+      }
+    } catch {
+      // skip unreadable conversations
+    }
+  }
+
+  return results.sort((a, b) => b.updatedAt - a.updatedAt);
 }
