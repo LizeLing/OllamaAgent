@@ -35,6 +35,7 @@ export interface AgentConfig {
     top_p?: number;
     num_predict?: number;
   };
+  enabledTools?: string[];
 }
 
 export interface AgentEvent {

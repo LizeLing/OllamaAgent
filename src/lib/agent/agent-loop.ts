@@ -27,7 +27,7 @@ export async function* runAgentLoop(
     userMsg,
   ];
 
-  const tools = toolRegistry.toOllamaTools();
+  const tools = toolRegistry.toOllamaTools(config.enabledTools);
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     yield { type: 'thinking', data: { iteration } };
