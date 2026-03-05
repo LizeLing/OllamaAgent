@@ -56,9 +56,9 @@ export async function* runAgentLoop(
         think: true,
         options: config.modelOptions,
       })) {
-        if (chunk.thinking) {
+        if (chunk.message?.thinking) {
           hasThinking = true;
-          yield { type: 'thinking_token', data: { content: chunk.thinking } };
+          yield { type: 'thinking_token', data: { content: chunk.message.thinking } };
         }
         if (chunk.message?.content) {
           yield { type: 'token', data: { content: chunk.message.content } };

@@ -55,9 +55,9 @@ export interface OllamaChatStreamChunk {
   message: {
     role: string;
     content: string;
+    thinking?: string;
   };
   done: boolean;
-  thinking?: string;
 }
 
 export interface OllamaGenerateRequest {

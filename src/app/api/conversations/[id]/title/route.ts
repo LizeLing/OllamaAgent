@@ -25,6 +25,8 @@ export async function POST(
     const result = await generate(settings.ollamaUrl, {
       model: settings.ollamaModel,
       prompt: `다음 대화의 제목을 한국어로 10자 이내로 요약하세요. 제목만 출력하세요.\n\n사용자: ${content}`,
+      think: false,
+      options: { num_predict: 30 },
     });
 
     let title = result.response.trim();
