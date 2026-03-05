@@ -121,16 +121,22 @@ code:not(pre code) {
 .markdown-body table {
   border-collapse: collapse;
   width: 100%;
-  margin: 0.5rem 0;
+  font-size: 0.875rem;
 }
 .markdown-body th, .markdown-body td {
   border: 1px solid var(--border);
-  padding: 0.5rem;
+  padding: 0.5rem 0.75rem;
   text-align: left;
 }
 .markdown-body th {
   background: var(--card);
   font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.markdown-body tr:hover td {
+  background: var(--card-hover);
 }
 
 .markdown-body a {

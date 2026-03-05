@@ -46,17 +46,35 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               'props' in codeElement
                 ? String(codeElement.props.children || '')
                 : '';
+
+            // Extract language from className (e.g., "language-typescript" → "typescript")
+            const lang =
+              typeof codeElement === 'object' &&
+              codeElement !== null &&
+              'props' in codeElement &&
+              codeElement.props.className
+                ? codeElement.props.className.replace(/^language-/, '').replace(/^hljs\s*/, '')
+                : '';
+
             return (
-              <div className="relative group">
+              <div className="relative group my-2">
+                {lang && (
+                  <div className="flex items-center justify-between px-4 py-1.5 bg-[#1a1a1a] rounded-t-lg border-b border-[#333]">
+                    <span className="text-[11px] text-muted font-mono">{lang}</span>
+                    <CopyButton code={codeText} />
+                  </div>
+                )}
                 <pre
-                  className="overflow-x-auto rounded-lg bg-[#111] p-4 my-2 font-[family-name:var(--font-jetbrains)] text-sm"
+                  className={`overflow-x-auto ${lang ? 'rounded-b-lg rounded-t-none' : 'rounded-lg'} bg-[#111] p-4 font-[family-name:var(--font-jetbrains)] text-sm`}
                   {...props}
                 >
                   {children}
                 </pre>
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <CopyButton code={codeText} />
-                </div>
+                {!lang && (
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <CopyButton code={codeText} />
+                  </div>
+                )}
               </div>
             );
           },
@@ -89,6 +107,22 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
               >
                 {children}
               </a>
+            );
+          },
+          table({ children, ...props }) {
+            return (
+              <div className="overflow-x-auto my-3 rounded-lg border border-border">
+                <table className="min-w-full" {...props}>
+                  {children}
+                </table>
+              </div>
+            );
+          },
+          tr({ children, ...props }) {
+            return (
+              <tr className="even:bg-card/50" {...props}>
+                {children}
+              </tr>
             );
           },
         }}
