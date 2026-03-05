@@ -12,10 +12,12 @@ export function waitForApproval(confirmId: string): Promise<boolean> {
   });
 }
 
-export function resolveApproval(confirmId: string, approved: boolean) {
+export function resolveApproval(confirmId: string, approved: boolean): boolean {
   const resolve = pendingApprovals.get(confirmId);
   if (resolve) {
     resolve(approved);
     pendingApprovals.delete(confirmId);
+    return true;
   }
+  return false;
 }
