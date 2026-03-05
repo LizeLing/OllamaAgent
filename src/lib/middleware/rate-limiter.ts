@@ -48,4 +48,5 @@ export const RATE_LIMITS = {
   chat: { maxTokens: 30, refillPerSecond: 0.5 } as RateLimitConfig,
   upload: { maxTokens: 10, refillPerSecond: 0.17 } as RateLimitConfig,
   api: { maxTokens: 60, refillPerSecond: 1 } as RateLimitConfig,
+  webhook: { maxTokens: 10, refillPerSecond: 0.17 } as RateLimitConfig,
 };
