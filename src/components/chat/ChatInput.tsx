@@ -4,6 +4,50 @@ import { useState, useRef, useCallback, KeyboardEvent } from 'react';
 import VoiceButton from '@/components/voice/VoiceButton';
 import { useVoice } from '@/hooks/useVoice';
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_IMAGE_DIMENSION = 2048;
+
+const processImage = async (file: File): Promise<string | null> => {
+  if (file.size > MAX_IMAGE_SIZE) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION) {
+          const ratio = Math.min(MAX_IMAGE_DIMENSION / width, MAX_IMAGE_DIMENSION / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        resolve(base64);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      img.src = url;
+    });
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+};
+
 interface ChatInputProps {
   onSend: (message: string, images?: string[]) => void;
   disabled?: boolean;
@@ -77,18 +121,12 @@ export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) 
     }
   }, [onDrop]);
 
-  const processImageFiles = (files: File[]) => {
+  const processImageFiles = async (files: File[]) => {
     for (const file of files) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        // Extract base64 data without the data URI prefix
-        const base64 = result.split(',')[1];
-        if (base64) {
-          setAttachedImages((prev) => [...prev, base64]);
-        }
-      };
-      reader.readAsDataURL(file);
+      const base64 = await processImage(file);
+      if (base64) {
+        setAttachedImages((prev) => [...prev, base64]);
+      }
     }
   };
 
@@ -133,19 +171,19 @@ export default function ChatInput({ onSend, disabled, onDrop }: ChatInputProps) 
       <div className="max-w-3xl mx-auto">
         {/* Attached images preview */}
         {attachedImages.length > 0 && (
-          <div className="flex gap-2 mb-2 flex-wrap">
+          <div className="flex gap-2 px-3 pt-2 flex-wrap">
             {attachedImages.map((img, i) => (
-              <div key={i} className="relative group/img">
+              <div key={i} className="relative group">
                 <img
                   src={`data:image/png;base64,${img}`}
-                  alt={`첨부 이미지 ${i + 1}`}
+                  alt={`첨부 ${i + 1}`}
                   className="w-16 h-16 object-cover rounded-lg border border-border"
                 />
                 <button
-                  onClick={() => removeImage(i)}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-error text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"
+                  onClick={() => setAttachedImages((prev) => prev.filter((_, idx) => idx !== i))}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-error text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  x
+                  ×
                 </button>
               </div>
             ))}

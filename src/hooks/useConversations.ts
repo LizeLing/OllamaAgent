@@ -9,6 +9,9 @@ export interface ConversationWithSnippet extends ConversationMeta {
   matchType?: 'title' | 'content';
 }
 
+const searchCache = new Map<string, { data: ConversationWithSnippet[]; timestamp: number }>();
+const CACHE_TTL = 30_000; // 30 seconds
+
 export function useConversations() {
   const [conversations, setConversations] = useState<ConversationWithSnippet[]>([]);
   const [folders, setFolders] = useState<FolderMeta[]>([]);
@@ -21,6 +24,7 @@ export function useConversations() {
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
+        searchCache.clear(); // Invalidate cache on data change
       }
     } catch {
       // fetch failed
@@ -89,11 +93,27 @@ export function useConversations() {
       await fetchConversations();
       return;
     }
+
+    // Check cache
+    const cached = searchCache.get(query);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      setConversations(cached.data);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/conversations/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
+        searchCache.set(query, { data, timestamp: Date.now() });
+
+        // Limit cache size
+        if (searchCache.size > 50) {
+          const oldest = Array.from(searchCache.entries())
+            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+          if (oldest) searchCache.delete(oldest[0]);
+        }
       }
     } catch {
       // search failed

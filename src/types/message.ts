@@ -1,3 +1,9 @@
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -10,6 +16,8 @@ export interface Message {
   thinkingDuration?: number;
   error?: string;
   aborted?: boolean;
+  tokenUsage?: TokenUsage;
+  model?: string;
 }
 
 export interface ToolCallInfo {

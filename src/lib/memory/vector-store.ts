@@ -100,3 +100,39 @@ export async function getMemoryCount(): Promise<number> {
   const index = await loadIndex();
   return index.length;
 }
+
+export async function deleteVector(id: string): Promise<void> {
+  try {
+    await fs.unlink(path.join(VECTORS_DIR, `${id}.json`));
+  } catch {
+    // file may not exist
+  }
+  const index = await loadIndex();
+  const filtered = index.filter((e) => e.id !== id);
+  await saveIndex(filtered);
+}
+
+export async function purgeExpiredMemories(maxAgeDays: number = 30, maxCount: number = 1000): Promise<number> {
+  const index = await loadIndex();
+  const now = Date.now();
+  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+
+  const valid = index.filter((e) => (now - e.createdAt) < maxAgeMs);
+  valid.sort((a, b) => b.createdAt - a.createdAt);
+  const toKeep = valid.slice(0, maxCount);
+  const toDelete = index.filter((e) => !toKeep.find((k) => k.id === e.id));
+
+  for (const entry of toDelete) {
+    try {
+      await fs.unlink(path.join(VECTORS_DIR, `${entry.id}.json`));
+    } catch {
+      // skip
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await saveIndex(toKeep);
+  }
+
+  return toDelete.length;
+}

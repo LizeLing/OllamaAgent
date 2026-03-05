@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: ChatRequest = await request.json();
+    const { model: requestModel } = body;
     const settings = await loadSettings();
 
     initializeTools(
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
           const agentLoop = runAgentLoop(
             {
               ollamaUrl: settings.ollamaUrl,
-              ollamaModel: settings.ollamaModel,
+              ollamaModel: requestModel || settings.ollamaModel,
               maxIterations: settings.maxIterations,
               systemPrompt: settings.systemPrompt,
               allowedPaths: settings.allowedPaths,
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    console.error('[CHAT_ERROR]', error instanceof Error ? error.message : error);
     const msg = error instanceof Error ? error.message : 'Unknown error';
     const errorStream = new ReadableStream({
       start(controller) {

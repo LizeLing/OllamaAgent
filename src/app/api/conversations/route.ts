@@ -7,7 +7,8 @@ export async function GET() {
   try {
     const conversations = await listConversations();
     return NextResponse.json(conversations);
-  } catch {
+  } catch (error) {
+    console.error('[CONVERSATIONS_LIST_ERROR]', error instanceof Error ? error.message : error);
     return NextResponse.json({ error: 'Failed to list conversations' }, { status: 500 });
   }
 }
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
 
     await saveConversation(conv);
     return NextResponse.json(conv, { status: 201 });
-  } catch {
+  } catch (error) {
+    console.error('[CONVERSATIONS_CREATE_ERROR]', error instanceof Error ? error.message : error);
     return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 });
   }
 }

@@ -18,7 +18,7 @@ async function ensureDir() {
   await fs.mkdir(CONVERSATIONS_DIR, { recursive: true });
 }
 
-async function readIndex(): Promise<ConversationMeta[]> {
+export async function readIndex(): Promise<ConversationMeta[]> {
   try {
     const data = await fs.readFile(INDEX_FILE, 'utf-8');
     return JSON.parse(data);

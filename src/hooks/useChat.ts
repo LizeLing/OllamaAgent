@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Message, ToolCallInfo, ImageInfo } from '@/types/message';
+import { Message, ToolCallInfo, ImageInfo, TokenUsage } from '@/types/message';
 import { v4 as uuidv4 } from 'uuid';
 import { addToast } from '@/hooks/useToast';
 
@@ -44,7 +44,7 @@ export function useChat() {
     }
   }, []);
 
-  const sendMessage = useCallback(async (content: string, images?: string[]) => {
+  const sendMessage = useCallback(async (content: string, images?: string[], model?: string) => {
     setError(null);
 
     const userMessage: Message = {
@@ -81,7 +81,7 @@ export function useChat() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, history, images }),
+        body: JSON.stringify({ message: content, history, images, model }),
         signal: abortController.signal,
       });
 
@@ -206,6 +206,17 @@ export function useChat() {
                 confirmId: data.confirmId as string,
               });
               return m;
+
+            case 'done': {
+              const updates: Partial<Message> = {};
+              if (data.tokenUsage) {
+                updates.tokenUsage = data.tokenUsage as unknown as TokenUsage;
+              }
+              if (data.model) {
+                updates.model = data.model as string;
+              }
+              return Object.keys(updates).length > 0 ? { ...m, ...updates } : m;
+            }
 
             case 'error':
               return {

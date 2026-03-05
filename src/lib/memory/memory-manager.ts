@@ -1,5 +1,5 @@
 import { getEmbedding } from './embedder';
-import { addVector, searchVectors } from './vector-store';
+import { addVector, searchVectors, purgeExpiredMemories, getMemoryCount } from './vector-store';
 
 export class MemoryManager {
   constructor(
@@ -26,6 +26,14 @@ export class MemoryManager {
       console.error('Failed to search memories:', err);
       return [];
     }
+  }
+
+  async purgeOld(maxAgeDays: number = 30, maxCount: number = 1000): Promise<number> {
+    return purgeExpiredMemories(maxAgeDays, maxCount);
+  }
+
+  async getCount(): Promise<number> {
+    return getMemoryCount();
   }
 
   async saveConversationSummary(
