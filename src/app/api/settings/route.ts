@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadSettings, saveSettings } from '@/lib/config/settings';
-import { resetTools } from '@/lib/tools/init';
 
 export async function GET() {
   const settings = await loadSettings();
@@ -11,7 +10,7 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
     const updated = await saveSettings(body);
-    resetTools(); // Force re-initialization with new settings
+    // Tools will be re-initialized on next chat request via config hash comparison
     return NextResponse.json(updated);
   } catch (error) {
     return NextResponse.json(

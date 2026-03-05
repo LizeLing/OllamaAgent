@@ -14,7 +14,7 @@ import { McpTool } from './mcp-tool';
 import { CustomToolDef, McpServerConfig } from '@/types/settings';
 import { listTools } from '@/lib/mcp/client';
 
-let initialized = false;
+let lastConfigHash = '';
 
 export function initializeTools(
   allowedPaths: string[],
@@ -23,7 +23,11 @@ export function initializeTools(
   ollamaUrl: string = 'http://localhost:11434',
   imageModel: string = 'x/z-image-turbo:latest'
 ) {
-  if (initialized) return;
+  // 설정이 동일하면 재등록 스킵 (성능 최적화)
+  const configHash = JSON.stringify({ allowedPaths, deniedPaths, searxngUrl, ollamaUrl, imageModel });
+  if (configHash === lastConfigHash) return;
+
+  toolRegistry.clear();
 
   toolRegistry.register(new FilesystemReadTool(allowedPaths, deniedPaths));
   toolRegistry.register(new FilesystemWriteTool(allowedPaths, deniedPaths));
@@ -34,7 +38,7 @@ export function initializeTools(
   toolRegistry.register(new CodeExecutorTool());
   toolRegistry.register(new ImageGeneratorTool(ollamaUrl, imageModel));
 
-  initialized = true;
+  lastConfigHash = configHash;
 }
 
 export function registerCustomTools(customTools: CustomToolDef[]) {
@@ -55,8 +59,4 @@ export async function registerMcpTools(mcpServers: McpServerConfig[]) {
       // MCP server unavailable, skip
     }
   }
-}
-
-export function resetTools() {
-  initialized = false;
 }

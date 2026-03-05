@@ -9,6 +9,10 @@ class ToolRegistry {
     this.tools.set(tool.definition.name, tool);
   }
 
+  clear(): void {
+    this.tools.clear();
+  }
+
   get(name: string): BaseTool | undefined {
     return this.tools.get(name);
   }
