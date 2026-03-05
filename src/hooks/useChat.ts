@@ -104,6 +104,10 @@ export function useChat() {
               });
               return m;
 
+            case 'loop_detected':
+              addToast('warning', data.message as string);
+              return m;
+
             case 'done': {
               const updates: Partial<Message> = {};
               if (data.tokenUsage) {

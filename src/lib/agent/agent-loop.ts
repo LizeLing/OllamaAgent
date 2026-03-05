@@ -2,6 +2,7 @@ import { AgentConfig, AgentEvent } from './types';
 import { toolRegistry } from '@/lib/tools/registry';
 import { chat, chatStream } from '@/lib/ollama/client';
 import { OllamaChatMessage } from '@/lib/ollama/types';
+import { ToolCallTracker } from './tool-call-tracker';
 
 export async function* runAgentLoop(
   config: AgentConfig,
@@ -32,6 +33,7 @@ export async function* runAgentLoop(
   ];
 
   const tools = toolRegistry.toOllamaTools(config.enabledTools);
+  const tracker = new ToolCallTracker();
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     yield { type: 'thinking', data: { iteration } };
@@ -109,10 +111,41 @@ export async function* runAgentLoop(
 
     // Execute each tool call
     const DANGEROUS_TOOLS = ['code_execute', 'filesystem_write'];
+    let loopAborted = false;
 
     for (const tc of toolCalls) {
       const toolName = tc.function.name;
       const toolArgs = tc.function.arguments;
+
+      // Loop detection check (before approval)
+      const checkResult = tracker.check(toolName, toolArgs);
+
+      if (checkResult.action === 'abort') {
+        yield {
+          type: 'loop_detected',
+          data: { toolName, count: 3, message: '동일 도구 반복 호출이 감지되어 에이전트를 중단했습니다.' },
+        };
+        messages.push({
+          role: 'tool',
+          content: `[시스템] 도구 반복 호출로 인해 에이전트가 중단되었습니다: '${toolName}'`,
+        });
+        iteration = config.maxIterations;
+        loopAborted = true;
+        break;
+      }
+
+      if (checkResult.action === 'inject') {
+        const cachedOutput = checkResult.cachedOutput;
+        const redirectMsg = `[시스템] 도구 반복 호출 감지: '${toolName}'을 동일한 입력으로 이미 호출했습니다.\n이전 결과: ${cachedOutput}\n동일한 도구 호출을 반복하지 말고 다른 접근 방식을 시도하세요.`;
+        messages.push({
+          role: 'tool',
+          content: redirectMsg,
+        });
+        tracker.record(toolName, toolArgs, cachedOutput);
+        continue;
+      }
+
+      // action === 'execute': proceed with normal execution
 
       // Check tool approval mode
       if (config.toolApprovalMode && config.toolApprovalMode !== 'auto') {
@@ -163,7 +196,22 @@ export async function* runAgentLoop(
         role: 'tool',
         content: observation,
       });
+
+      // Record tool call result and check for repeating patterns
+      tracker.record(toolName, toolArgs, observation);
+
+      if (tracker.detectRepeatingPattern()) {
+        yield {
+          type: 'loop_detected',
+          data: { toolName, count: 3, message: '동일 도구 반복 호출이 감지되어 에이전트를 중단했습니다.' },
+        };
+        iteration = config.maxIterations;
+        loopAborted = true;
+        break;
+      }
     }
+
+    if (loopAborted) break;
   }
 
   // Max iterations reached
