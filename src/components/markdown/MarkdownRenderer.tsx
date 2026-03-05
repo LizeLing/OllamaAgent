@@ -3,11 +3,27 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { useState } from 'react';
 
 interface MarkdownRendererProps {
   content: string;
 }
+
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [
+      ...(defaultSchema.attributes?.code || []),
+      ['className', /^language-\w+$/, /^hljs$/],
+    ],
+    span: [
+      ...(defaultSchema.attributes?.span || []),
+      ['className', /^hljs-\w+$/],
+    ],
+  },
+};
 
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -33,7 +49,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     <div className="markdown-body">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={[[rehypeSanitize, sanitizeSchema], rehypeHighlight]}
         components={{
           pre({ children, ...props }) {
             const codeElement = children as React.ReactElement<{
