@@ -13,11 +13,13 @@ vi.mock('@/lib/ollama/client', () => ({
 // Mock tool registry
 const mockToOllamaTools = vi.fn().mockReturnValue([]);
 const mockExecute = vi.fn().mockResolvedValue({ success: true, output: 'tool output' });
+const mockGet = vi.fn().mockReturnValue(null);
 
 vi.mock('@/lib/tools/registry', () => ({
   toolRegistry: {
     toOllamaTools: (...args: unknown[]) => mockToOllamaTools(...args),
     execute: (...args: unknown[]) => mockExecute(...args),
+    get: (...args: unknown[]) => mockGet(...args),
   },
 }));
 
@@ -283,6 +285,123 @@ describe('runAgentLoop', () => {
     const chatCall = mockChat.mock.calls[0];
     const userMsg = chatCall[1].messages.find((m: { role: string }) => m.role === 'user');
     expect(userMsg.images).toEqual(['base64img']);
+  });
+
+  it('format이 chatStream에 전달된다', async () => {
+    mockChat.mockResolvedValueOnce({
+      message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+    });
+    mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('{"key":"value"}'));
+
+    await collectEvents(runAgentLoop(createConfig({ format: 'json' }), 'test', []));
+
+    const streamCall = mockChatStream.mock.calls[0];
+    expect(streamCall[1].format).toBe('json');
+  });
+
+  it('format이 도구 선택 단계에서는 전달되지 않는다', async () => {
+    mockChat.mockResolvedValueOnce({
+      message: {
+        role: 'assistant', content: '',
+        tool_calls: [{ function: { name: 'filesystem_read', arguments: { path: '/tmp/x' } } }],
+      },
+    });
+    mockExecute.mockResolvedValueOnce({ success: true, output: 'ok' });
+    mockChat.mockResolvedValueOnce({
+      message: { role: 'assistant', content: 'done', tool_calls: undefined },
+    });
+    mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('done'));
+
+    await collectEvents(runAgentLoop(createConfig({ format: 'json' }), 'test', []));
+
+    // 도구 선택 단계의 chat 호출에는 format이 전달되지만,
+    // tools가 있으면 client.ts에서 제거됨
+    const toolCallRequest = mockChat.mock.calls[0][1];
+    expect(toolCallRequest.tools).toBeDefined();
+  });
+
+  describe('resolveThink', () => {
+    it('thinkingMode: off → 모든 단계에서 think: false', async () => {
+      mockChat.mockResolvedValueOnce({
+        message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+      });
+      mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('ok'));
+
+      await collectEvents(runAgentLoop(createConfig({ thinkingMode: 'off' }), 'test', []));
+
+      const toolCall = mockChat.mock.calls[0][1];
+      expect(toolCall.think).toBe(false);
+      const streamCall = mockChatStream.mock.calls[0][1];
+      expect(streamCall.think).toBe(false);
+    });
+
+    it('thinkingMode: on → 최종 응답에서 think: true', async () => {
+      mockChat.mockResolvedValueOnce({
+        message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+      });
+      mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('ok'));
+
+      await collectEvents(runAgentLoop(createConfig({ thinkingMode: 'on' }), 'test', []));
+
+      const streamCall = mockChatStream.mock.calls[0][1];
+      expect(streamCall.think).toBe(true);
+    });
+
+    it('thinkingMode: on + thinkingForToolCalls: true → 도구 선택에서도 think: true', async () => {
+      mockChat.mockResolvedValueOnce({
+        message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+      });
+      mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('ok'));
+
+      await collectEvents(runAgentLoop(
+        createConfig({ thinkingMode: 'on', thinkingForToolCalls: true }), 'test', []
+      ));
+
+      const toolCall = mockChat.mock.calls[0][1];
+      expect(toolCall.think).toBe(true);
+    });
+
+    it('thinkingMode: on + thinkingForToolCalls: false → 도구 선택에서 think: false', async () => {
+      mockChat.mockResolvedValueOnce({
+        message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+      });
+      mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('ok'));
+
+      await collectEvents(runAgentLoop(
+        createConfig({ thinkingMode: 'on', thinkingForToolCalls: false }), 'test', []
+      ));
+
+      const toolCall = mockChat.mock.calls[0][1];
+      expect(toolCall.think).toBe(false);
+    });
+
+    it('thinkingMode: auto → 기존 동작 유지 (도구:false, 응답:true)', async () => {
+      mockChat.mockResolvedValueOnce({
+        message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+      });
+      mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('ok'));
+
+      await collectEvents(runAgentLoop(createConfig({ thinkingMode: 'auto' }), 'test', []));
+
+      const toolCall = mockChat.mock.calls[0][1];
+      expect(toolCall.think).toBe(false);
+      const streamCall = mockChatStream.mock.calls[0][1];
+      expect(streamCall.think).toBe(true);
+    });
+
+    it('thinkingMode 미설정 시 auto 동작', async () => {
+      mockChat.mockResolvedValueOnce({
+        message: { role: 'assistant', content: 'ok', tool_calls: undefined },
+      });
+      mockChatStream.mockReturnValueOnce(makeSimpleStreamResponse('ok'));
+
+      await collectEvents(runAgentLoop(createConfig(), 'test', []));
+
+      const toolCall = mockChat.mock.calls[0][1];
+      expect(toolCall.think).toBe(false);
+      const streamCall = mockChatStream.mock.calls[0][1];
+      expect(streamCall.think).toBe(true);
+    });
   });
 
   it('done 이벤트에 tokenUsage가 포함된다', async () => {

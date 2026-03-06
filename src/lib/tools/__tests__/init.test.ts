@@ -16,6 +16,7 @@ vi.mock('../filesystem', () => ({
 
 vi.mock('../http-client', () => ({ HttpClientTool: vi.fn() }));
 vi.mock('../web-search', () => ({ WebSearchTool: vi.fn() }));
+vi.mock('../web-fetch', () => ({ WebFetchTool: vi.fn() }));
 vi.mock('../code-executor', () => ({ CodeExecutorTool: vi.fn() }));
 vi.mock('../image-generator', () => ({ ImageGeneratorTool: vi.fn() }));
 vi.mock('../custom-tool', () => {
@@ -99,5 +100,28 @@ describe('initializeTools', () => {
     await Promise.all([p1, p2]);
     // initPromise guard prevents second init
     expect(mockReplaceAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('webSearchProvider와 ollamaApiKey를 전달하면 config hash가 달라진다', async () => {
+    await initializeTools(['/data'], ['/sys'], 'http://localhost:8888', 'http://localhost:11434', 'sd', 'ollama', 'test-key');
+    expect(mockReplaceAll).toHaveBeenCalledTimes(1);
+
+    // Same params should not re-initialize
+    await initializeTools(['/data'], ['/sys'], 'http://localhost:8888', 'http://localhost:11434', 'sd', 'ollama', 'test-key');
+    expect(mockReplaceAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('ollamaApiKey가 있으면 WebFetchTool이 추가된다 (9개 도구)', async () => {
+    await initializeTools(['/fetch'], ['/no'], 'http://localhost:8888', 'http://localhost:11434', 'sd', 'ollama', 'api-key-123');
+    expect(mockReplaceAll).toHaveBeenCalledTimes(1);
+    const tools = mockReplaceAll.mock.calls[0][0];
+    expect(tools).toHaveLength(9);
+  });
+
+  it('ollamaApiKey가 없으면 기본 8개 도구만 등록된다', async () => {
+    await initializeTools(['/nofetch'], ['/no'], 'http://localhost:8888', 'http://localhost:11434', 'sd', 'searxng', '');
+    expect(mockReplaceAll).toHaveBeenCalledTimes(1);
+    const tools = mockReplaceAll.mock.calls[0][0];
+    expect(tools).toHaveLength(8);
   });
 });

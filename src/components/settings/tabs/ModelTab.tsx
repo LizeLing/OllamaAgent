@@ -1,9 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Settings } from '@/types/settings';
 import ModelOptionsSliders from '../ModelOptionsSliders';
 import HelpTooltip from '@/components/ui/HelpTooltip';
+
+interface LoadedModel {
+  name: string;
+  size: number;
+  size_vram: number;
+  expires_at: string;
+  details: {
+    parameter_size?: string;
+    quantization_level?: string;
+    family?: string;
+  };
+}
 
 interface ModelTabProps {
   draft: Partial<Settings>;
@@ -16,6 +28,8 @@ const HELP = {
   fallbackModels: '기본 모델 실패 시 순서대로 시도할 대체 모델 목록입니다.',
   maxIterations: '에이전트가 도구를 연속 호출할 수 있는 최대 반복 횟수입니다.\n\n권장: 10',
   modelOptions: '모델의 응답 생성 방식을 제어하는 파라미터입니다.',
+  loadedModels: '현재 Ollama 메모리에 로드된 모델입니다.\n\n미리 로드하면 첫 응답이 빨라집니다.',
+  thinkingMode: '모델의 Thinking(추론 과정 표시) 동작을 제어합니다.\n\nAuto: 최종 응답에만 Thinking 사용\nOn: 항상 Thinking 사용\nOff: Thinking 비활성화',
 };
 
 const inputClass =
@@ -23,18 +37,49 @@ const inputClass =
 const selectClass =
   'w-full bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent appearance-none cursor-pointer';
 
+function formatSize(bytes: number): string {
+  const gb = bytes / (1024 ** 3);
+  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / (1024 ** 2)).toFixed(0)} MB`;
+}
+
 export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
   const [models, setModels] = useState<string[]>([]);
+  const [loadedModels, setLoadedModels] = useState<LoadedModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchModels = useCallback(() => {
     setLoadingModels(true);
     fetch('/api/models')
       .then((r) => r.json())
-      .then((data) => setModels(data.models || []))
-      .catch(() => setModels([]))
+      .then((data) => {
+        setModels(data.models || []);
+        setLoadedModels(data.loaded || []);
+      })
+      .catch(() => { setModels([]); setLoadedModels([]); })
       .finally(() => setLoadingModels(false));
   }, []);
+
+  useEffect(() => { fetchModels(); }, [fetchModels]);
+
+  const handleModelAction = async (model: string, action: 'load' | 'unload') => {
+    setActionInProgress(model);
+    try {
+      const res = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, action }),
+      });
+      if (res.ok) {
+        // Refresh after a short delay for Ollama to update
+        setTimeout(fetchModels, 500);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setActionInProgress(null);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -86,6 +131,84 @@ export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
             className={inputClass}
             placeholder="e.g. qwen3.5:9b"
           />
+        )}
+      </section>
+
+      <hr className="border-border" />
+
+      {/* Loaded Models */}
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Loaded Models</label>
+            <HelpTooltip text={HELP.loadedModels} />
+          </div>
+          <button
+            onClick={fetchModels}
+            disabled={loadingModels}
+            className="text-xs text-accent hover:text-accent-hover disabled:opacity-50"
+          >
+            {loadingModels ? '...' : '새로고침'}
+          </button>
+        </div>
+
+        {loadedModels.length > 0 ? (
+          <div className="space-y-1.5 mb-3">
+            {loadedModels.map((lm) => (
+              <div key={lm.name} className="flex items-center gap-2 bg-card rounded-lg px-3 py-2">
+                <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{lm.name}</div>
+                  <div className="text-[10px] text-muted">
+                    {lm.details.parameter_size && <span>{lm.details.parameter_size}</span>}
+                    {lm.details.quantization_level && <span> · {lm.details.quantization_level}</span>}
+                    <span> · VRAM {formatSize(lm.size_vram)}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleModelAction(lm.name, 'unload')}
+                  disabled={actionInProgress === lm.name}
+                  className="text-xs text-error hover:text-red-400 disabled:opacity-50 shrink-0"
+                >
+                  {actionInProgress === lm.name ? '...' : '언로드'}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted mb-3">로드된 모델이 없습니다.</p>
+        )}
+
+        {models.length > 0 && (
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <select
+                id="load-model-select"
+                defaultValue=""
+                className={selectClass}
+              >
+                <option value="" disabled>모델 선택...</option>
+                {models
+                  .filter((m) => !loadedModels.some((lm) => lm.name === m))
+                  .map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 4.5L6 7.5L9 4.5"/></svg>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const sel = document.getElementById('load-model-select') as HTMLSelectElement;
+                if (sel?.value) handleModelAction(sel.value, 'load');
+              }}
+              disabled={!!actionInProgress}
+              className="px-4 py-1.5 text-sm bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 shrink-0"
+            >
+              {actionInProgress ? '로딩...' : '로드'}
+            </button>
+          </div>
         )}
       </section>
 
@@ -185,6 +308,46 @@ export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
           options={draft.modelOptions || { temperature: 0.7, topP: 0.9, numPredict: 2048 }}
           onChange={(modelOptions) => onDraftChange({ modelOptions })}
         />
+      </section>
+
+      <hr className="border-border" />
+
+      {/* Thinking Mode */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-foreground">Thinking Mode</h3>
+          <HelpTooltip text={HELP.thinkingMode} />
+        </div>
+        <div className="space-y-2">
+          {([
+            { value: 'auto', label: 'Auto — 최종 응답에만 Thinking' },
+            { value: 'on', label: 'On — 항상 Thinking 사용' },
+            { value: 'off', label: 'Off — Thinking 비활성화' },
+          ] as { value: 'off' | 'on' | 'auto'; label: string }[]).map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="thinkingMode"
+                value={opt.value}
+                checked={(draft.thinkingMode || 'auto') === opt.value}
+                onChange={() => onDraftChange({ thinkingMode: opt.value })}
+                className="accent-accent"
+              />
+              <span className="text-sm">{opt.label}</span>
+            </label>
+          ))}
+        </div>
+        {(draft.thinkingMode || 'auto') === 'on' && (
+          <label className="flex items-center gap-2 mt-3 ml-5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.thinkingForToolCalls ?? false}
+              onChange={(e) => onDraftChange({ thinkingForToolCalls: e.target.checked })}
+              className="accent-accent"
+            />
+            <span className="text-sm text-muted">도구 호출 시에도 Thinking 사용</span>
+          </label>
+        )}
       </section>
     </div>
   );

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(body.history)) {
       body.history = [];
     }
-    const { model: requestModel } = body;
+    const { model: requestModel, format: requestFormat } = body;
     const settings = await loadSettings();
 
     initializeTools(
@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
       settings.deniedPaths,
       settings.searxngUrl,
       settings.ollamaUrl,
-      settings.imageModel
+      settings.imageModel,
+      settings.webSearchProvider || 'searxng',
+      settings.ollamaApiKey || ''
     );
 
     // Register custom tools and MCP tools
@@ -101,6 +103,9 @@ export async function POST(request: NextRequest) {
               } : undefined,
               enabledTools: settings.enabledTools?.length ? settings.enabledTools : undefined,
               fallbackModels: settings.fallbackModels || [],
+              format: requestFormat,
+              thinkingMode: settings.thinkingMode || 'auto',
+              thinkingForToolCalls: settings.thinkingForToolCalls ?? false,
               onToolApproval: settings.toolApprovalMode !== 'auto'
                 ? (_toolName: string, _args: Record<string, unknown>, confirmId: string) => {
                     return waitForApproval(confirmId);

@@ -5,6 +5,20 @@ import { chatWithFailover } from '@/lib/ollama/failover';
 import { OllamaChatMessage } from '@/lib/ollama/types';
 import { ToolCallTracker } from './tool-call-tracker';
 
+function resolveThink(
+  config: AgentConfig,
+  phase: 'tool_selection' | 'final_response'
+): boolean {
+  const mode = config.thinkingMode || 'auto';
+  if (mode === 'off') return false;
+  if (mode === 'on') {
+    if (phase === 'tool_selection') return config.thinkingForToolCalls ?? false;
+    return true;
+  }
+  // auto: 기존 동작 유지
+  return phase === 'final_response';
+}
+
 export async function* runAgentLoop(
   config: AgentConfig,
   userMessage: string,
@@ -43,7 +57,7 @@ export async function* runAgentLoop(
     // Non-streaming call to check for tool use (think: false for speed)
     const { result: response, usedModel, failedModels } = await chatWithFailover(
       rawChat, config.ollamaUrl,
-      { model: activeModel, messages, stream: false, think: false, tools, options: config.modelOptions },
+      { model: activeModel, messages, stream: false, think: resolveThink(config, 'tool_selection'), tools, options: config.modelOptions },
       config.fallbackModels || []
     );
 
@@ -65,8 +79,9 @@ export async function* runAgentLoop(
       for await (const chunk of chatStream(config.ollamaUrl, {
         model: activeModel,
         messages,
-        think: true,
+        think: resolveThink(config, 'final_response'),
         options: config.modelOptions,
+        format: config.format,
       })) {
         if (chunk.done) {
           promptTokens = chunk.prompt_eval_count || 0;

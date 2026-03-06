@@ -39,6 +39,7 @@ vi.mock('@/lib/tools/init', () => ({
   initializeTools: vi.fn(),
   registerCustomTools: vi.fn(),
   registerMcpTools: vi.fn(() => Promise.resolve()),
+  registerSubAgentTool: vi.fn(),
 }));
 
 vi.mock('@/lib/memory/memory-manager', () => {
@@ -182,5 +183,80 @@ describe('POST /api/chat', () => {
 
     expect(res.status).toBe(200);
     expect(runAgentLoop).toHaveBeenCalled();
+  });
+
+  it('format 파라미터가 agentConfig에 전달된다', async () => {
+    await POST(makeRequest({ message: 'hi', format: 'json' }));
+
+    const callArgs = vi.mocked(runAgentLoop).mock.calls[0];
+    const config = callArgs[0];
+    expect(config.format).toBe('json');
+  });
+
+  it('format이 없을 때 agentConfig.format은 undefined', async () => {
+    await POST(makeRequest({ message: 'hi' }));
+
+    const callArgs = vi.mocked(runAgentLoop).mock.calls[0];
+    const config = callArgs[0];
+    expect(config.format).toBeUndefined();
+  });
+
+  it('thinking 설정이 agentConfig에 전달된다', async () => {
+    const mockSettings = vi.mocked(loadSettings);
+    mockSettings.mockResolvedValueOnce({
+      ollamaUrl: 'http://localhost:11434',
+      ollamaModel: 'llama3',
+      embeddingModel: 'nomic-embed-text',
+      maxIterations: 10,
+      systemPrompt: '',
+      allowedPaths: [],
+      deniedPaths: [],
+      searxngUrl: '',
+      imageModel: '',
+      toolApprovalMode: 'auto',
+      customTools: [],
+      mcpServers: [],
+      enabledTools: [],
+      modelOptions: null,
+      thinkingMode: 'on',
+      thinkingForToolCalls: true,
+    } as unknown as Awaited<ReturnType<typeof loadSettings>>);
+
+    await POST(makeRequest({ message: 'hi' }));
+
+    const callArgs = vi.mocked(runAgentLoop).mock.calls[0];
+    const config = callArgs[0];
+    expect(config.thinkingMode).toBe('on');
+    expect(config.thinkingForToolCalls).toBe(true);
+  });
+
+  it('webSearchProvider와 ollamaApiKey가 initializeTools에 전달된다', async () => {
+    const mockSettings = vi.mocked(loadSettings);
+    mockSettings.mockResolvedValueOnce({
+      ollamaUrl: 'http://localhost:11434',
+      ollamaModel: 'llama3',
+      embeddingModel: 'nomic-embed-text',
+      maxIterations: 10,
+      systemPrompt: '',
+      allowedPaths: [],
+      deniedPaths: [],
+      searxngUrl: '',
+      imageModel: '',
+      toolApprovalMode: 'auto',
+      customTools: [],
+      mcpServers: [],
+      enabledTools: [],
+      modelOptions: null,
+      webSearchProvider: 'ollama',
+      ollamaApiKey: 'my-key',
+    } as unknown as Awaited<ReturnType<typeof loadSettings>>);
+
+    await POST(makeRequest({ message: 'hi' }));
+
+    expect(initializeTools).toHaveBeenCalledWith(
+      expect.any(Array), expect.any(Array),
+      expect.any(String), expect.any(String), expect.any(String),
+      'ollama', 'my-key'
+    );
   });
 });

@@ -40,6 +40,7 @@ export interface OllamaChatRequest {
     [key: string]: unknown;
   };
   think?: boolean;
+  format?: 'json' | Record<string, unknown>;
 }
 
 export interface OllamaChatResponse {

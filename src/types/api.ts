@@ -4,6 +4,7 @@ export interface ChatRequest {
   images?: string[];
   model?: string;
   skillId?: string;
+  format?: 'json' | Record<string, unknown>;
 }
 
 export interface SSEEvent {

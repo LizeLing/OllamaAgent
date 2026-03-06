@@ -173,7 +173,7 @@ export function useChat() {
     []
   );
 
-  const sendMessage = useCallback(async (content: string, images?: string[], model?: string) => {
+  const sendMessage = useCallback(async (content: string, images?: string[], model?: string, format?: 'json' | Record<string, unknown>) => {
     setError(null);
 
     const userMessage: Message = {
@@ -210,7 +210,7 @@ export function useChat() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, history, images, model }),
+        body: JSON.stringify({ message: content, history, images, model, format }),
         signal: abortController.signal,
       });
 
@@ -226,6 +226,7 @@ export function useChat() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let eventType = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -235,7 +236,6 @@ export function useChat() {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        let eventType = '';
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             eventType = line.slice(7).trim();
@@ -244,6 +244,7 @@ export function useChat() {
             try {
               const data = JSON.parse(dataStr);
               handleSSEEvent(assistantId, eventType, data);
+              eventType = '';
             } catch {
               // Partial SSE data, skip malformed JSON
             }

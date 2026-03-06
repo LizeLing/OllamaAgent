@@ -22,6 +22,8 @@ const TEXT_EXTENSIONS = [
   '.html', '.css', '.xml', '.yaml', '.yml', '.toml',
 ];
 
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+
 export async function POST(request: NextRequest) {
   try {
     const clientIP = request.headers.get('x-forwarded-for') || 'unknown';
@@ -66,7 +68,9 @@ export async function POST(request: NextRequest) {
 
     // If text file, read content and try to save to memory
     const isText = TEXT_EXTENSIONS.includes(ext);
+    const isImage = IMAGE_EXTENSIONS.includes(ext);
     let textContent: string | undefined;
+    let imageBase64: string | undefined;
 
     if (isText) {
       textContent = Buffer.from(bytes).toString('utf-8');
@@ -80,6 +84,8 @@ export async function POST(request: NextRequest) {
       } catch {
         // Memory save failed, file is still uploaded
       }
+    } else if (isImage) {
+      imageBase64 = Buffer.from(bytes).toString('base64');
     }
 
     return NextResponse.json({
@@ -88,6 +94,8 @@ export async function POST(request: NextRequest) {
       path: filepath,
       size: file.size,
       content: textContent?.slice(0, 5000),
+      imageBase64,
+      isImage,
     });
   } catch (error) {
     return NextResponse.json(

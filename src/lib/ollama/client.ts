@@ -45,10 +45,14 @@ export async function chat(
   baseUrl: string,
   request: OllamaChatRequest
 ): Promise<OllamaChatResponse> {
+  const payload = { ...request, stream: false };
+  if (payload.tools && payload.tools.length > 0) {
+    delete payload.format;
+  }
   const res = await fetchWithRetry(`${baseUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...request, stream: false, think: false }),
+    body: JSON.stringify(payload),
   });
   return res.json();
 }
@@ -60,7 +64,11 @@ export async function* chatStream(
   const res = await fetchWithRetry(`${baseUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...request, stream: true }),
+    body: JSON.stringify({
+      ...request,
+      stream: true,
+      ...(request.tools && request.tools.length > 0 ? { format: undefined } : {}),
+    }),
   });
 
   const reader = res.body?.getReader();

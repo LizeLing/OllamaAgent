@@ -40,6 +40,9 @@ export interface AgentConfig {
   activeSkill?: import('@/types/skills').AgentSkill;
   nestingDepth?: number;
   maxNestingDepth?: number;
+  format?: 'json' | Record<string, unknown>;
+  thinkingMode?: 'off' | 'on' | 'auto';
+  thinkingForToolCalls?: boolean;
 }
 
 export interface AgentEvent {

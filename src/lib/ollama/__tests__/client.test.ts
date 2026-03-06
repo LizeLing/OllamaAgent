@@ -24,7 +24,7 @@ describe('Ollama Client', () => {
   });
 
   describe('chat()', () => {
-    it('올바른 POST body를 전송한다 (stream:false, think:false)', async () => {
+    it('올바른 POST body를 전송한다 (stream:false)', async () => {
       const responseBody = { model: 'test', message: { role: 'assistant', content: 'hi' }, done: true };
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -45,7 +45,6 @@ describe('Ollama Client', () => {
       );
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.stream).toBe(false);
-      expect(body.think).toBe(false);
       expect(result).toEqual(responseBody);
     });
 
@@ -62,6 +61,72 @@ describe('Ollama Client', () => {
       });
 
       expect(result.message.content).toBe('response');
+    });
+
+    it('format 파라미터를 전달한다', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ model: 'test', message: { role: 'assistant', content: '{}' }, done: true }),
+      });
+
+      await chat('http://localhost:11434', {
+        model: 'test',
+        messages: [{ role: 'user', content: 'test' }],
+        format: 'json',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.format).toBe('json');
+    });
+
+    it('tools와 format이 동시에 있으면 format을 제거한다', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ model: 'test', message: { role: 'assistant', content: 'hi' }, done: true }),
+      });
+
+      await chat('http://localhost:11434', {
+        model: 'test',
+        messages: [{ role: 'user', content: 'test' }],
+        format: 'json',
+        tools: [{ type: 'function', function: { name: 'test_tool', description: 'test', parameters: { type: 'object', properties: {}, required: [] } } }],
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.format).toBeUndefined();
+      expect(body.tools).toBeDefined();
+    });
+
+    it('request의 think 값을 그대로 전달한다', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ model: 'test', message: { role: 'assistant', content: 'hi' }, done: true }),
+      });
+
+      await chat('http://localhost:11434', {
+        model: 'test',
+        messages: [{ role: 'user', content: 'test' }],
+        think: true,
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.think).toBe(true);
+    });
+
+    it('think가 없으면 기본적으로 포함되지 않는다', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ model: 'test', message: { role: 'assistant', content: 'hi' }, done: true }),
+      });
+
+      await chat('http://localhost:11434', {
+        model: 'test',
+        messages: [{ role: 'user', content: 'test' }],
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      // think is not explicitly set, so undefined becomes absent in JSON
+      expect(body.think).toBeUndefined();
     });
   });
 

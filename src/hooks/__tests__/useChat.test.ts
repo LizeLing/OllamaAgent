@@ -167,4 +167,34 @@ describe('useChat', () => {
       body: JSON.stringify({ confirmId: 'confirm-1', approved: true }),
     }));
   });
+
+  it('sendMessage에 format 파라미터를 전달한다', async () => {
+    const sseData = 'event: token\ndata: {"content":"ok"}\n\nevent: done\ndata: {}\n\n';
+    global.fetch = mockFetchSSE(sseData);
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage('test', undefined, undefined, 'json');
+    });
+
+    const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(fetchCall[1]?.body as string);
+    expect(body.format).toBe('json');
+  });
+
+  it('format 없이 sendMessage를 호출하면 format이 body에 없다', async () => {
+    const sseData = 'event: token\ndata: {"content":"ok"}\n\nevent: done\ndata: {}\n\n';
+    global.fetch = mockFetchSSE(sseData);
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage('test');
+    });
+
+    const fetchCall = vi.mocked(global.fetch).mock.calls[0];
+    const body = JSON.parse(fetchCall[1]?.body as string);
+    expect(body.format).toBeUndefined();
+  });
 });

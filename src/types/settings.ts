@@ -55,4 +55,8 @@ export interface Settings {
   modelOptions: ModelOptions;
   enabledTools?: string[];
   fallbackModels: string[];
+  thinkingMode: 'off' | 'on' | 'auto';
+  thinkingForToolCalls: boolean;
+  webSearchProvider: 'searxng' | 'ollama';
+  ollamaApiKey: string;
 }

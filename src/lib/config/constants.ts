@@ -27,4 +27,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   enabledTools: [],
   fallbackModels: [],
+  thinkingMode: 'auto' as const,
+  thinkingForToolCalls: false,
+  webSearchProvider: 'searxng' as const,
+  ollamaApiKey: '',
 };

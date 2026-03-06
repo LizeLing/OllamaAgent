@@ -7,6 +7,7 @@ import {
 } from './filesystem';
 import { HttpClientTool } from './http-client';
 import { WebSearchTool } from './web-search';
+import { WebFetchTool } from './web-fetch';
 import { CodeExecutorTool } from './code-executor';
 import { ImageGeneratorTool } from './image-generator';
 import { CustomTool } from './custom-tool';
@@ -23,9 +24,11 @@ export async function initializeTools(
   deniedPaths: string[],
   searxngUrl: string = 'http://localhost:8888',
   ollamaUrl: string = 'http://localhost:11434',
-  imageModel: string = 'x/z-image-turbo:latest'
+  imageModel: string = 'x/z-image-turbo:latest',
+  webSearchProvider: 'searxng' | 'ollama' = 'searxng',
+  ollamaApiKey: string = ''
 ) {
-  const configHash = JSON.stringify({ allowedPaths, deniedPaths, searxngUrl, ollamaUrl, imageModel });
+  const configHash = JSON.stringify({ allowedPaths, deniedPaths, searxngUrl, ollamaUrl, imageModel, webSearchProvider, ollamaApiKey });
   if (configHash === lastConfigHash) return;
 
   // Prevent concurrent initialization
@@ -43,10 +46,18 @@ export async function initializeTools(
         new FilesystemListTool(allowedPaths, deniedPaths),
         new FilesystemSearchTool(allowedPaths, deniedPaths),
         new HttpClientTool(),
-        new WebSearchTool(searxngUrl),
+        new WebSearchTool({
+          provider: webSearchProvider,
+          searxngUrl,
+          ollamaApiKey,
+        }),
         new CodeExecutorTool(),
         new ImageGeneratorTool(ollamaUrl, imageModel),
       ];
+
+      if (ollamaApiKey) {
+        tools.push(new WebFetchTool(ollamaApiKey));
+      }
 
       toolRegistry.replaceAll(tools);
       lastConfigHash = configHash;

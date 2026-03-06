@@ -22,6 +22,7 @@ const HELP = {
   preset: '미리 정의된 설정 프리셋을 선택하여 빠르게 적용할 수 있습니다.',
   toolApproval: '도구 실행 시 사용자 확인을 요구하는 방식을 설정합니다.',
   systemPrompt: '에이전트의 성격과 행동 방식을 정의하는 시스템 프롬프트입니다.',
+  webSearch: '웹 검색 엔진을 선택합니다.\n\nSearXNG: 로컬 검색 엔진 (Docker 필요)\nOllama: Ollama 공식 Web Search API (API Key 필요)',
   searxngUrl: 'SearXNG 검색 엔진의 URL입니다.\n\nDocker로 실행: docker run -p 8888:8080 searxng/searxng',
   ttsVoice: '텍스트를 음성으로 변환(TTS)할 때 사용할 음성입니다.',
   importExport: '설정을 JSON 파일로 내보내거나 가져올 수 있습니다.',
@@ -114,17 +115,51 @@ export default function GeneralTab({ draft, onDraftChange }: GeneralTabProps) {
 
       <hr className="border-border" />
 
-      {/* SearXNG URL */}
+      {/* Web Search Provider */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-foreground">SearXNG URL</h3>
-          <HelpTooltip text={HELP.searxngUrl} />
+          <h3 className="text-sm font-semibold text-foreground">웹 검색 엔진</h3>
+          <HelpTooltip text={HELP.webSearch} />
         </div>
-        <input
-          value={draft.searxngUrl || ''}
-          onChange={(e) => onDraftChange({ searxngUrl: e.target.value })}
-          className={inputClass}
-        />
+        <div className="space-y-2 mb-3">
+          {([
+            { value: 'searxng', label: 'SearXNG (로컬)' },
+            { value: 'ollama', label: 'Ollama Web Search (API)' },
+          ] as { value: 'searxng' | 'ollama'; label: string }[]).map((opt) => (
+            <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="webSearchProvider"
+                value={opt.value}
+                checked={(draft.webSearchProvider || 'searxng') === opt.value}
+                onChange={() => onDraftChange({ webSearchProvider: opt.value })}
+                className="accent-accent"
+              />
+              <span className="text-sm">{opt.label}</span>
+            </label>
+          ))}
+        </div>
+        {(draft.webSearchProvider || 'searxng') === 'searxng' ? (
+          <div>
+            <label className="text-xs text-muted mb-1 block">SearXNG URL</label>
+            <input
+              value={draft.searxngUrl || ''}
+              onChange={(e) => onDraftChange({ searxngUrl: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-muted mb-1 block">Ollama API Key</label>
+            <input
+              type="password"
+              value={draft.ollamaApiKey || ''}
+              onChange={(e) => onDraftChange({ ollamaApiKey: e.target.value })}
+              className={inputClass}
+              placeholder="ollama.com에서 발급받은 API Key"
+            />
+          </div>
+        )}
       </section>
 
       <hr className="border-border" />

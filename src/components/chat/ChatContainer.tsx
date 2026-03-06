@@ -8,6 +8,9 @@ import { addToast } from '@/hooks/useToast';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
 import SettingsPanel from '@/components/settings/SettingsPanel';
+import SkillEditor from '@/components/settings/SkillEditor';
+import CronJobEditor from '@/components/settings/CronJobEditor';
+import HelpTooltip from '@/components/ui/HelpTooltip';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
@@ -52,7 +55,7 @@ export default function ChatContainer() {
     deleteFolder: deleteFolderFn,
     renameFolder,
   } = useConversations();
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'chat' | 'settings' | 'skills' | 'cron'>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Set initial sidebar state based on screen size after hydration
@@ -101,7 +104,7 @@ export default function ChatContainer() {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
-        setSettingsOpen((prev) => !prev);
+        setActiveView((prev) => prev === 'settings' ? 'chat' : 'settings');
       }
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'N') {
         e.preventDefault();
@@ -205,6 +208,8 @@ export default function ChatContainer() {
           const data = await res.json();
           if (data.content) {
             handleSend(`파일 "${data.originalName}"의 내용입니다:\n\n\`\`\`\n${data.content}\n\`\`\``);
+          } else if (data.imageBase64) {
+            handleSend(`이미지 "${data.originalName}"을 분석해주세요.`, [data.imageBase64]);
           } else {
             handleSend(`파일 "${data.originalName}"을 업로드했습니다. (경로: ${data.path})`);
           }
@@ -299,13 +304,13 @@ export default function ChatContainer() {
           // 스킬 이름으로 실행
           fetch('/api/skills')
             .then((r) => r.json())
-            .then((skills: Array<{ id: string; name: string; triggerCommand?: string; icon?: string; description: string }>) => {
+            .then((data) => {
+              const skills: Array<{ id: string; name: string; triggerCommand?: string; icon?: string; description: string }> = data.skills || data;
               const skill = skills.find(
                 (s) => s.triggerCommand === args[0] || s.name === args[0] || s.id === args[0]
               );
               if (skill) {
                 addSystemMessage(`스킬 "${skill.icon || '📋'} ${skill.name}" 실행 중...`);
-                // skillId를 포함하여 메시지 전송 - sendMessage에 skillId 전달은 직접 fetch로 처리
                 handleSend(`[스킬 실행: ${skill.name}] ${args.slice(1).join(' ') || skill.description}`);
               } else {
                 addSystemMessage(`스킬 "${args[0]}"을 찾을 수 없습니다.`);
@@ -316,7 +321,8 @@ export default function ChatContainer() {
           // 스킬 목록 표시
           fetch('/api/skills')
             .then((r) => r.json())
-            .then((skills: Array<{ icon?: string; name: string; triggerCommand?: string; description: string; workflow: unknown[] }>) => {
+            .then((data) => {
+              const skills: Array<{ icon?: string; name: string; triggerCommand?: string; description: string; workflow: unknown[] }> = data.skills || data;
               if (skills.length === 0) {
                 addSystemMessage('등록된 스킬이 없습니다.');
               } else {
@@ -396,8 +402,8 @@ export default function ChatContainer() {
         conversations={conversations}
         folders={folders}
         activeId={activeId}
-        onSelect={(id) => { setSettingsOpen(false); handleSelectConversation(id); }}
-        onNew={() => { setSettingsOpen(false); handleNewChat(); }}
+        onSelect={(id) => { setActiveView('chat'); handleSelectConversation(id); }}
+        onNew={() => { setActiveView('chat'); handleNewChat(); }}
         onDelete={handleDeleteConversation}
         onRename={renameConversation}
         onSearch={search}
@@ -412,8 +418,8 @@ export default function ChatContainer() {
         onDeleteFolder={deleteFolderFn}
         onRenameFolder={renameFolder}
         onUpdateTags={updateTags}
-        settingsOpen={settingsOpen}
-        onSettingsOpen={() => setSettingsOpen(true)}
+        activeView={activeView}
+        onViewChange={(view) => setActiveView(view as 'chat' | 'settings' | 'skills' | 'cron')}
       />
 
       <main className="flex-1 flex flex-col min-w-0 relative">
@@ -509,12 +515,48 @@ export default function ChatContainer() {
           </div>
         </header>
 
-        {settingsOpen ? (
+        {activeView === 'settings' ? (
           <SettingsPanel
-            onClose={() => setSettingsOpen(false)}
+            onClose={() => setActiveView('chat')}
             settings={settings}
             onSave={updateSettings}
           />
+        ) : activeView === 'skills' ? (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-6 py-6 md:py-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold">스킬 관리</h2>
+                  <HelpTooltip text={"다단계 워크플로우를 정의하여 에이전트가 복잡한 작업을 체계적으로 수행하도록 합니다.\n\n/skill 명령어로 실행합니다."} />
+                </div>
+                <button
+                  onClick={() => setActiveView('chat')}
+                  className="px-3 py-1.5 text-sm text-muted hover:text-foreground bg-card hover:bg-card-hover rounded-lg transition-colors"
+                >
+                  돌아가기
+                </button>
+              </div>
+              <SkillEditor />
+            </div>
+          </div>
+        ) : activeView === 'cron' ? (
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-6 py-6 md:py-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-semibold">예약 작업</h2>
+                  <HelpTooltip text={"주기적으로 자동 실행되는 예약 작업을 관리합니다.\n\n작업 유형: 에이전트 실행, HTTP 요청, 메모리 정리, 건강 체크"} />
+                </div>
+                <button
+                  onClick={() => setActiveView('chat')}
+                  className="px-3 py-1.5 text-sm text-muted hover:text-foreground bg-card hover:bg-card-hover rounded-lg transition-colors"
+                >
+                  돌아가기
+                </button>
+              </div>
+              <CronJobEditor />
+            </div>
+          </div>
         ) : (
           <>
             {/* Messages */}
