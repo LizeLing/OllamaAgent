@@ -31,4 +31,6 @@ export const DEFAULT_SETTINGS: Settings = {
   thinkingForToolCalls: false,
   webSearchProvider: 'searxng' as const,
   ollamaApiKey: '',
+  numParallel: 1,
+  maxLoadedModels: 1,
 };

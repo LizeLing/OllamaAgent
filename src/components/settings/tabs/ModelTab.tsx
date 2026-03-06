@@ -30,6 +30,8 @@ const HELP = {
   modelOptions: '모델의 응답 생성 방식을 제어하는 파라미터입니다.',
   loadedModels: '현재 Ollama 메모리에 로드된 모델입니다.\n\n미리 로드하면 첫 응답이 빨라집니다.',
   thinkingMode: '모델의 Thinking(추론 과정 표시) 동작을 제어합니다.\n\nAuto: 최종 응답에만 Thinking 사용\nOn: 항상 Thinking 사용\nOff: Thinking 비활성화',
+  numParallel: '하나의 모델이 동시에 처리할 수 있는 요청 수입니다.\n\n값이 클수록 동시 요청을 더 많이 처리하지만 VRAM 사용량이 증가합니다.\n\n기본값: 1',
+  maxLoadedModels: 'VRAM에 동시에 로드할 수 있는 최대 모델 수입니다.\n\n여러 모델을 동시에 사용할 때 유용합니다.\n\n기본값: 1',
 };
 
 const inputClass =
@@ -47,6 +49,8 @@ export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
   const [loadedModels, setLoadedModels] = useState<LoadedModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const [restartResult, setRestartResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const fetchModels = useCallback(() => {
     setLoadingModels(true);
@@ -348,6 +352,80 @@ export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
             <span className="text-sm text-muted">도구 호출 시에도 Thinking 사용</span>
           </label>
         )}
+      </section>
+
+      <hr className="border-border" />
+
+      {/* Parallel Processing */}
+      <section>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-foreground">병렬 처리</h3>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-sm text-muted">동시 요청 수 (OLLAMA_NUM_PARALLEL)</label>
+              <HelpTooltip text={HELP.numParallel} />
+            </div>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={draft.numParallel || 1}
+              onChange={(e) => onDraftChange({ numParallel: Math.max(1, Math.min(8, parseInt(e.target.value) || 1)) })}
+              className="w-24 bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <label className="text-sm text-muted">최대 로드 모델 수 (OLLAMA_MAX_LOADED_MODELS)</label>
+              <HelpTooltip text={HELP.maxLoadedModels} />
+            </div>
+            <input
+              type="number"
+              min={1}
+              max={4}
+              value={draft.maxLoadedModels || 1}
+              onChange={(e) => onDraftChange({ maxLoadedModels: Math.max(1, Math.min(4, parseInt(e.target.value) || 1)) })}
+              className="w-24 bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div className="pt-1">
+            <p className="text-xs text-yellow-500 mb-2">변경 사항을 적용하려면 Ollama를 재시작해야 합니다. 진행 중인 요청이 중단됩니다.</p>
+            <button
+              onClick={async () => {
+                setRestarting(true);
+                setRestartResult(null);
+                try {
+                  const res = await fetch('/api/ollama/restart', { method: 'POST' });
+                  const data = await res.json();
+                  if (res.ok) {
+                    setRestartResult({ ok: true, message: `Ollama 재시작 완료 (NUM_PARALLEL=${data.numParallel}, MAX_LOADED_MODELS=${data.maxLoadedModels})` });
+                    setTimeout(fetchModels, 1000);
+                  } else {
+                    setRestartResult({ ok: false, message: data.error || '재시작 실패' });
+                  }
+                } catch {
+                  setRestartResult({ ok: false, message: 'Ollama 재시작 요청 실패' });
+                } finally {
+                  setRestarting(false);
+                }
+              }}
+              disabled={restarting}
+              className="px-4 py-1.5 text-sm bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50"
+            >
+              {restarting ? 'Ollama 재시작 중...' : 'Ollama 재시작'}
+            </button>
+            {restartResult && (
+              <p className={`text-xs mt-2 ${restartResult.ok ? 'text-green-500' : 'text-error'}`}>
+                {restartResult.message}
+              </p>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );

@@ -59,4 +59,6 @@ export interface Settings {
   thinkingForToolCalls: boolean;
   webSearchProvider: 'searxng' | 'ollama';
   ollamaApiKey: string;
+  numParallel: number;
+  maxLoadedModels: number;
 }
