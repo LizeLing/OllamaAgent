@@ -1,5 +1,10 @@
 export type ToolApprovalMode = 'auto' | 'confirm' | 'deny-dangerous';
 
+export interface MemoryCategoryConfig {
+  weight: number;
+  maxAgeDays: number;
+}
+
 export interface AgentPreset {
   id: string;
   name: string;
@@ -61,4 +66,5 @@ export interface Settings {
   ollamaApiKey: string;
   numParallel: number;
   maxLoadedModels: number;
+  memoryCategories: Record<string, MemoryCategoryConfig>;
 }

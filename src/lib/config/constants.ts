@@ -33,4 +33,10 @@ export const DEFAULT_SETTINGS: Settings = {
   ollamaApiKey: '',
   numParallel: 1,
   maxLoadedModels: 1,
+  memoryCategories: {
+    technical: { weight: 1.2, maxAgeDays: 60 },
+    research: { weight: 1.0, maxAgeDays: 30 },
+    preference: { weight: 1.5, maxAgeDays: 90 },
+    general: { weight: 0.8, maxAgeDays: 14 },
+  },
 };
