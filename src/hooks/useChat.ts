@@ -147,6 +147,12 @@ export function useChat() {
               addToast('info', `서브에이전트(${data.agentType}) 작업 완료`);
               return m;
 
+            case 'knowledge_search':
+              return {
+                ...m,
+                knowledgeSources: data.sources as import('@/types/knowledge').SearchResultWithSource[],
+              };
+
             case 'done': {
               const updates: Partial<Message> = {};
               if (data.tokenUsage) {

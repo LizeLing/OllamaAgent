@@ -19,6 +19,7 @@ export interface Message {
   tokenUsage?: TokenUsage;
   model?: string;
   skillProgress?: { current: number; total: number; skillName: string };
+  knowledgeSources?: import('@/types/knowledge').SearchResultWithSource[];
 }
 
 export interface ToolCallInfo {
