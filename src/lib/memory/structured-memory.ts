@@ -5,6 +5,8 @@
  * 검색 품질을 향상시킨다.
  */
 
+import type { MemoryCategoryConfig } from '@/types/settings';
+
 export type MemoryCategory = 'technical' | 'research' | 'preference' | 'general';
 
 export const MEMORY_CATEGORIES: Record<MemoryCategory, { weight: number; maxAge: number }> = {
@@ -39,4 +41,24 @@ export function categorizeMemory(text: string): MemoryCategory {
     if (keywords.test(text)) return category;
   }
   return 'general';
+}
+
+export function getMemoryWeight(
+  category: MemoryCategory,
+  customCategories?: Record<string, MemoryCategoryConfig>
+): number {
+  if (customCategories?.[category]) {
+    return customCategories[category].weight;
+  }
+  return MEMORY_CATEGORIES[category]?.weight ?? 1.0;
+}
+
+export function getMemoryMaxAge(
+  category: MemoryCategory,
+  customCategories?: Record<string, MemoryCategoryConfig>
+): number {
+  if (customCategories?.[category]) {
+    return customCategories[category].maxAgeDays;
+  }
+  return MEMORY_CATEGORIES[category]?.maxAge ?? 30;
 }

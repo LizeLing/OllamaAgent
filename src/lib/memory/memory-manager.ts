@@ -1,13 +1,15 @@
 import { getEmbedding } from './embedder';
 import { addVector, searchVectors, purgeExpiredMemories, getMemoryCount } from './vector-store';
 import { scrubMemoryText } from './scrubber';
-import { categorizeMemory, MEMORY_CATEGORIES, type MemoryCategory } from './structured-memory';
+import { categorizeMemory, getMemoryWeight, type MemoryCategory } from './structured-memory';
+import type { MemoryCategoryConfig } from '@/types/settings';
 import { logger } from '@/lib/logger';
 
 export class MemoryManager {
   constructor(
     private ollamaUrl: string,
-    private embeddingModel: string
+    private embeddingModel: string,
+    private memoryCategories?: Record<string, MemoryCategoryConfig>
   ) {}
 
   async saveMemory(text: string, metadata?: Record<string, unknown>): Promise<string> {
@@ -28,7 +30,7 @@ export class MemoryManager {
       // 카테고리 가중치를 유사도에 곱하여 정렬
       const weighted = results.map((r) => {
         const category = (r.metadata?.category as MemoryCategory) || 'general';
-        const weight = MEMORY_CATEGORIES[category]?.weight ?? 1.0;
+        const weight = getMemoryWeight(category, this.memoryCategories);
         return {
           text: r.text,
           weightedSimilarity: r.similarity * weight,
