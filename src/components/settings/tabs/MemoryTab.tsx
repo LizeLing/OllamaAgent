@@ -43,6 +43,11 @@ export default function MemoryTab({ draft, onDraftChange }: MemoryTabProps) {
   const [loadingMemories, setLoadingMemories] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
   const ITEMS_PER_PAGE = 20;
+  const [addMode, setAddMode] = useState<'text' | 'file' | 'url'>('text');
+  const [addContent, setAddContent] = useState('');
+  const [addCategory, setAddCategory] = useState('general');
+  const [addFile, setAddFile] = useState<File | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const fetchModels = useCallback(() => {
     setLoadingModels(true);
@@ -96,6 +101,37 @@ export default function MemoryTab({ draft, onDraftChange }: MemoryTabProps) {
   };
 
   const categories = draft.memoryCategories || {};
+
+  const handleAdd = async () => {
+    setAdding(true);
+    try {
+      if (addMode === 'file' && addFile) {
+        const formData = new FormData();
+        formData.append('file', addFile);
+        formData.append('category', addCategory);
+        await fetch('/api/memory', { method: 'POST', body: formData });
+      } else if (addMode === 'url' && addContent.trim()) {
+        await fetch('/api/memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'url', content: addContent, category: addCategory }),
+        });
+      } else if (addMode === 'text' && addContent.trim()) {
+        await fetch('/api/memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'text', content: addContent, category: addCategory }),
+        });
+      }
+      setAddContent('');
+      setAddFile(null);
+      fetchMemories();
+    } catch {
+      // ignore
+    } finally {
+      setAdding(false);
+    }
+  };
 
   const handleCategoryChange = (
     key: string,
@@ -359,6 +395,81 @@ export default function MemoryTab({ draft, onDraftChange }: MemoryTabProps) {
             </div>
           );
         })()}
+      </section>
+
+      <hr className="border-border" />
+
+      <section>
+        <label className="text-sm font-medium mb-3 block">메모리 추가</label>
+
+        {/* 탭 전환 */}
+        <div className="flex gap-1 mb-3">
+          {(['text', 'file', 'url'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => { setAddMode(mode); setAddContent(''); setAddFile(null); }}
+              className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                addMode === mode
+                  ? 'bg-accent/10 text-accent font-medium'
+                  : 'text-muted hover:text-foreground hover:bg-card'
+              }`}
+            >
+              {{ text: '텍스트', file: '파일', url: 'URL' }[mode]}
+            </button>
+          ))}
+        </div>
+
+        {/* 입력 영역 (모드별) */}
+        {addMode === 'text' && (
+          <textarea
+            value={addContent}
+            onChange={(e) => setAddContent(e.target.value)}
+            placeholder="메모리에 저장할 내용을 입력하세요..."
+            rows={4}
+            className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent resize-none mb-2"
+          />
+        )}
+        {addMode === 'file' && (
+          <div className="mb-2">
+            <input
+              type="file"
+              accept=".txt,.md,.pdf"
+              onChange={(e) => setAddFile(e.target.files?.[0] || null)}
+              className="text-sm text-muted"
+            />
+            {addFile && <p className="text-xs text-muted mt-1">{addFile.name}</p>}
+          </div>
+        )}
+        {addMode === 'url' && (
+          <input
+            type="url"
+            value={addContent}
+            onChange={(e) => setAddContent(e.target.value)}
+            placeholder="https://..."
+            className="w-full bg-card border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-accent mb-2"
+          />
+        )}
+
+        {/* 카테고리 + 저장 버튼 */}
+        <div className="flex gap-2">
+          <select
+            value={addCategory}
+            onChange={(e) => setAddCategory(e.target.value)}
+            className="bg-card border border-border rounded-lg px-2 py-1.5 text-sm"
+          >
+            <option value="technical">기술</option>
+            <option value="research">리서치</option>
+            <option value="preference">선호</option>
+            <option value="general">일반</option>
+          </select>
+          <button
+            onClick={handleAdd}
+            disabled={adding}
+            className="px-4 py-1.5 text-sm bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50"
+          >
+            {adding ? '저장 중...' : '추가'}
+          </button>
+        </div>
       </section>
     </div>
   );
