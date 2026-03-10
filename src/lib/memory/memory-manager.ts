@@ -1,6 +1,7 @@
 import { getEmbedding } from './embedder';
 import { addVector, searchVectors, purgeExpiredMemories, getMemoryCount } from './vector-store';
 import { scrubMemoryText } from './scrubber';
+import { categorizeMemory, MEMORY_CATEGORIES, type MemoryCategory } from './structured-memory';
 import { logger } from '@/lib/logger';
 
 export class MemoryManager {
@@ -23,7 +24,19 @@ export class MemoryManager {
     try {
       const queryVector = await getEmbedding(this.ollamaUrl, this.embeddingModel, query);
       const results = await searchVectors(queryVector, topK);
-      return results.map((r) => r.text);
+
+      // 카테고리 가중치를 유사도에 곱하여 정렬
+      const weighted = results.map((r) => {
+        const category = (r.metadata?.category as MemoryCategory) || 'general';
+        const weight = MEMORY_CATEGORIES[category]?.weight ?? 1.0;
+        return {
+          text: r.text,
+          weightedSimilarity: r.similarity * weight,
+        };
+      });
+
+      weighted.sort((a, b) => b.weightedSimilarity - a.weightedSimilarity);
+      return weighted.map((r) => r.text);
     } catch (err) {
       logger.error('MEMORY', 'Failed to search memories', err);
       return [];
@@ -44,6 +57,7 @@ export class MemoryManager {
   ): Promise<void> {
     const rawSummary = `User: ${userMessage.slice(0, 200)}\nAssistant: ${assistantResponse.slice(0, 500)}`;
     const summary = scrubMemoryText(rawSummary);
-    await this.saveMemory(summary, { type: 'conversation' });
+    const category = categorizeMemory(summary);
+    await this.saveMemory(summary, { type: 'conversation', category });
   }
 }
