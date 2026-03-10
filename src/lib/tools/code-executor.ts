@@ -3,8 +3,6 @@ import { ToolDefinition, ToolResult } from '@/lib/agent/types';
 import { TIMEOUTS, LIMITS } from '@/lib/config/timeouts';
 import Docker from 'dockerode';
 
-const docker = new Docker();
-
 const LANGUAGE_CONFIGS: Record<string, { image: string; cmd: (code: string) => string[] }> = {
   python: {
     image: 'python:3.12-slim',
@@ -21,6 +19,11 @@ const LANGUAGE_CONFIGS: Record<string, { image: string; cmd: (code: string) => s
 };
 
 export class CodeExecutorTool extends BaseTool {
+  private static docker: Docker | null = null;
+  private static dockerAvailable: boolean | null = null;
+  private static lastCheckTime = 0;
+  private static readonly CHECK_INTERVAL = 30_000; // 30초
+
   definition: ToolDefinition = {
     name: 'code_execute',
     description:
@@ -30,6 +33,26 @@ export class CodeExecutorTool extends BaseTool {
       { name: 'code', type: 'string', description: '실행할 코드', required: true },
     ],
   };
+
+  private async ensureDocker(): Promise<Docker> {
+    const now = Date.now();
+    if (
+      CodeExecutorTool.docker &&
+      CodeExecutorTool.dockerAvailable &&
+      now - CodeExecutorTool.lastCheckTime < CodeExecutorTool.CHECK_INTERVAL
+    ) {
+      return CodeExecutorTool.docker;
+    }
+
+    if (!CodeExecutorTool.docker) {
+      CodeExecutorTool.docker = new Docker();
+    }
+
+    await CodeExecutorTool.docker.ping();
+    CodeExecutorTool.dockerAvailable = true;
+    CodeExecutorTool.lastCheckTime = now;
+    return CodeExecutorTool.docker;
+  }
 
   async execute(args: Record<string, unknown>): Promise<ToolResult> {
     const language = (args.language as string || '').toLowerCase();
@@ -42,10 +65,11 @@ export class CodeExecutorTool extends BaseTool {
       return this.error(`Unsupported language: ${language}. Supported: ${Object.keys(LANGUAGE_CONFIGS).join(', ')}`);
     }
 
+    let docker: Docker;
     try {
-      // Check Docker availability
-      await docker.ping();
+      docker = await this.ensureDocker();
     } catch {
+      CodeExecutorTool.dockerAvailable = false;
       return this.error('Docker is not available. Cannot execute code.');
     }
 
