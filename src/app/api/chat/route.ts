@@ -78,7 +78,11 @@ export async function POST(request: NextRequest) {
     let memoryManager: MemoryManager | null = null;
     let memories: string[] = [];
     try {
-      memoryManager = new MemoryManager(settings.ollamaUrl, settings.embeddingModel);
+      memoryManager = new MemoryManager(
+        settings.ollamaUrl,
+        settings.embeddingModel,
+        settings.memoryCategories
+      );
       memories = await memoryManager.searchMemories(body.message, 3);
     } catch {
       // RAG unavailable, continue without memories
