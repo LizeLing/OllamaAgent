@@ -42,6 +42,7 @@ yarn-error.log*
 /data/generated/
 /data/settings.json
 /data/conversations/
+/data/artifacts/
 /data/folders.json
 
 # logs
