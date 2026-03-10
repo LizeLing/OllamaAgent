@@ -1,5 +1,6 @@
 import { getEmbedding } from './embedder';
 import { addVector, searchVectors, purgeExpiredMemories, getMemoryCount } from './vector-store';
+import { scrubMemoryText } from './scrubber';
 import { logger } from '@/lib/logger';
 
 export class MemoryManager {
@@ -41,7 +42,8 @@ export class MemoryManager {
     userMessage: string,
     assistantResponse: string
   ): Promise<void> {
-    const summary = `User: ${userMessage.slice(0, 200)}\nAssistant: ${assistantResponse.slice(0, 500)}`;
+    const rawSummary = `User: ${userMessage.slice(0, 200)}\nAssistant: ${assistantResponse.slice(0, 500)}`;
+    const summary = scrubMemoryText(rawSummary);
     await this.saveMemory(summary, { type: 'conversation' });
   }
 }
