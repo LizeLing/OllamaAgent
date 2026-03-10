@@ -140,7 +140,7 @@ async function parseXlsx(content: Buffer): Promise<ParsedSection[]> {
 
     for (const worksheet of workbook.worksheets) {
       const rows: string[] = [];
-      worksheet.eachRow((row, _rowNumber) => {
+      worksheet.eachRow((row) => {
         const values = (row.values as (string | number | null)[])
           .slice(1)
           .map((v) => (v != null ? String(v) : ''))
