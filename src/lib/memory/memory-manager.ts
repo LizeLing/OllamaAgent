@@ -53,6 +53,32 @@ export class MemoryManager {
     return getMemoryCount();
   }
 
+  async saveManualMemory(
+    text: string,
+    category: MemoryCategory
+  ): Promise<string> {
+    const scrubbed = scrubMemoryText(text);
+    return this.saveMemory(scrubbed, { type: 'manual', category });
+  }
+
+  async saveFromUrl(
+    url: string,
+    category: MemoryCategory
+  ): Promise<string> {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error(`URL fetch failed: ${res.status}`);
+    const html = await res.text();
+    // HTML에서 텍스트 추출 (간단한 태그 제거)
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 5000);
+    return this.saveManualMemory(text, category);
+  }
+
   async saveConversationSummary(
     userMessage: string,
     assistantResponse: string
