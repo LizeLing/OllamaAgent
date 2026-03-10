@@ -8,39 +8,52 @@ import {
   OllamaEmbedResponse,
   OllamaError,
 } from './types';
+import { CircuitBreaker } from '@/lib/infra/circuit-breaker';
 
 const MAX_RETRIES = 2;
+
+/** Ollama 전용 Circuit Breaker: 연속 5회 실패 시 30초간 차단 */
+const ollamaBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeoutMs: 30000,
+  name: 'ollama',
+});
+
+/** Circuit Breaker를 외부에서 참조할 수 있도록 export */
+export { ollamaBreaker };
 
 async function fetchWithRetry(
   url: string,
   options: RequestInit,
   retries = MAX_RETRIES
 ): Promise<Response> {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const res = await fetch(url, options);
-      if (!res.ok) {
-        throw new OllamaError(
-          `Ollama API error: ${res.status} ${res.statusText}`,
-          res.status
-        );
+  return ollamaBreaker.execute(async () => {
+    for (let i = 0; i <= retries; i++) {
+      try {
+        const res = await fetch(url, options);
+        if (!res.ok) {
+          throw new OllamaError(
+            `Ollama API error: ${res.status} ${res.statusText}`,
+            res.status
+          );
+        }
+        return res;
+      } catch (error) {
+        if (i === retries) {
+          if (error instanceof OllamaError) throw error;
+          throw new OllamaError(
+            `Ollama connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            undefined,
+            error
+          );
+        }
+        // 지수 백오프 + jitter (최대 30초)
+        const delayMs = Math.min(1000 * Math.pow(2, i), 30000);
+        await new Promise((r) => setTimeout(r, delayMs + Math.random() * 1000));
       }
-      return res;
-    } catch (error) {
-      if (i === retries) {
-        if (error instanceof OllamaError) throw error;
-        throw new OllamaError(
-          `Ollama connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          undefined,
-          error
-        );
-      }
-      // 지수 백오프 + jitter (최대 30초)
-      const delayMs = Math.min(1000 * Math.pow(2, i), 30000);
-      await new Promise((r) => setTimeout(r, delayMs + Math.random() * 1000));
     }
-  }
-  throw new OllamaError('Unexpected error in fetchWithRetry');
+    throw new OllamaError('Unexpected error in fetchWithRetry');
+  });
 }
 
 export async function chat(
