@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { categorizeMemory, getMemoryWeight, type MemoryCategory } from '../structured-memory';
+import { categorizeMemory, getMemoryWeight } from '../structured-memory';
 
 describe('categorizeMemory', () => {
   it('기술 키워드를 technical로 분류한다', () => {
