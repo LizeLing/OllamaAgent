@@ -15,6 +15,9 @@ import { McpTool } from './mcp-tool';
 import { CustomToolDef, McpServerConfig } from '@/types/settings';
 import { listTools } from '@/lib/mcp/client';
 import { BaseTool } from './base-tool';
+import { MtimeCache } from '@/lib/infra/file-cache';
+import { DATA_DIR } from '@/lib/config/constants';
+import path from 'path';
 
 let lastConfigHash = '';
 let initPromise: Promise<void> | null = null;
@@ -82,7 +85,24 @@ export function registerSubAgentTool(config: AgentConfig): void {
   toolRegistry.register(new DelegateToSubAgentTool(config));
 }
 
+const settingsCache = new MtimeCache<{ mcpServers?: McpServerConfig[] }>(
+  path.join(DATA_DIR, 'settings.json'),
+  async (content) => JSON.parse(content)
+);
+
+let lastMcpConfigHash = '';
+
 export async function registerMcpTools(mcpServers: McpServerConfig[]) {
+  // 설정 파일의 mtime을 확인하여 MCP 설정이 변경되지 않았으면 건너뛴다
+  const cached = await settingsCache.get();
+  const currentHash = JSON.stringify(
+    mcpServers.map(s => ({ id: s.id, url: s.url, enabled: s.enabled }))
+  );
+  if (cached && currentHash === lastMcpConfigHash) {
+    return;
+  }
+
+  // 기존 MCP 도구 제거 후 재등록
   for (const server of mcpServers) {
     if (!server.enabled) continue;
     try {
@@ -94,4 +114,5 @@ export async function registerMcpTools(mcpServers: McpServerConfig[]) {
       // MCP server unavailable, skip
     }
   }
+  lastMcpConfigHash = currentHash;
 }
