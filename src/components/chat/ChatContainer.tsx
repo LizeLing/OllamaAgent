@@ -17,6 +17,8 @@ import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
 import ShortcutGuide from '@/components/ui/ShortcutGuide';
 import StatsPanel from '@/components/ui/StatsPanel';
 import ToolLogPanel from '@/components/ui/ToolLogPanel';
+import ArtifactPanel from '@/components/artifacts/ArtifactPanel';
+import { Artifact } from '@/types/artifacts';
 import { useCommands } from './useCommands';
 import { useDragDrop } from './useDragDrop';
 
@@ -70,6 +72,8 @@ export default function ChatContainer() {
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [toolLogOpen, setToolLogOpen] = useState(false);
+  const [showArtifacts, setShowArtifacts] = useState(false);
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const prevMessagesLenRef = useRef(0);
@@ -97,6 +101,21 @@ export default function ChatContainer() {
       .then((data) => setAvailableModels(data.models || []))
       .catch(() => {});
   }, []);
+
+  // 대화별 아티팩트 조회
+  useEffect(() => {
+    if (!conversationId) {
+      setArtifacts([]);
+      setShowArtifacts(false);
+      return;
+    }
+    fetch(`/api/artifacts?conversationId=${conversationId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setArtifacts(data);
+      })
+      .catch(() => setArtifacts([]));
+  }, [conversationId]);
 
   const handleNewChat = useCallback(() => {
     clearMessages();
@@ -374,20 +393,54 @@ export default function ChatContainer() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Messages */}
-            <MessageList
-              messages={messages}
-              isLoading={isLoading}
-              onEdit={editMessage}
-              onRegenerate={regenerate}
-              onSend={(msg) => handleSend(msg)}
-              onBranch={handleBranch}
-            />
+          <div className="flex flex-1 overflow-hidden">
+            {/* 채팅 영역 */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Messages */}
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                onEdit={editMessage}
+                onRegenerate={regenerate}
+                onSend={(msg) => handleSend(msg)}
+                onBranch={handleBranch}
+              />
 
-            {/* Input */}
-            <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} onCommand={handleCommand} disabled={isLoading} onDrop={handleFileDrop} />
-          </>
+              {/* Input */}
+              <div className="relative">
+                {/* 아티팩트 토글 버튼 */}
+                {artifacts.length > 0 && (
+                  <button
+                    onClick={() => setShowArtifacts((prev) => !prev)}
+                    className={`absolute -top-10 right-4 px-2.5 py-1 text-xs rounded-lg transition-colors flex items-center gap-1.5 ${
+                      showArtifacts
+                        ? 'bg-accent/20 text-accent'
+                        : 'bg-card text-muted-foreground hover:text-foreground hover:bg-card-hover'
+                    }`}
+                    title="아티팩트 패널 토글"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    아티팩트 ({artifacts.length})
+                  </button>
+                )}
+                <ChatInput onSend={(msg, imgs) => handleSend(msg, imgs)} onCommand={handleCommand} disabled={isLoading} onDrop={handleFileDrop} />
+              </div>
+            </div>
+
+            {/* 아티팩트 패널 */}
+            {showArtifacts && conversationId && (
+              <div className="w-[400px] shrink-0">
+                <ArtifactPanel
+                  conversationId={conversationId}
+                  artifacts={artifacts}
+                  onClose={() => setShowArtifacts(false)}
+                />
+              </div>
+            )}
+          </div>
         )}
       </main>
 
