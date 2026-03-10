@@ -38,6 +38,7 @@ describe('Vector Store', () => {
   let deleteVector: typeof import('../vector-store').deleteVector;
   let purgeExpiredMemories: typeof import('../vector-store').purgeExpiredMemories;
   let getMemoryCount: typeof import('../vector-store').getMemoryCount;
+  let getMemoryList: typeof import('../vector-store').getMemoryList;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -55,6 +56,7 @@ describe('Vector Store', () => {
     deleteVector = mod.deleteVector;
     purgeExpiredMemories = mod.purgeExpiredMemories;
     getMemoryCount = mod.getMemoryCount;
+    getMemoryList = mod.getMemoryList;
   });
 
   it('addVector: 파일을 쓰고 인덱스를 업데이트한다', async () => {
@@ -165,5 +167,51 @@ describe('Vector Store', () => {
     // readFile rejects by default → loadIndex returns []
     const results = await searchVectors([1, 0, 0], 5, 0.3);
     expect(results).toEqual([]);
+  });
+
+  describe('getMemoryList', () => {
+    it('페이지네이션된 메모리 목록을 반환한다', async () => {
+      const index = [
+        { id: 'v1', text: '메모리 1', metadata: { category: 'technical' }, createdAt: 1000 },
+        { id: 'v2', text: '메모리 2', metadata: { category: 'research' }, createdAt: 2000 },
+        { id: 'v3', text: '메모리 3', metadata: { category: 'general' }, createdAt: 3000 },
+      ];
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+
+      const result = await getMemoryList({ page: 1, limit: 2 });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.total).toBe(3);
+      expect(result.items[0]).toHaveProperty('id');
+      expect(result.items[0]).toHaveProperty('text');
+      expect(result.items[0]).toHaveProperty('metadata');
+      expect(result.items[0]).toHaveProperty('createdAt');
+    });
+
+    it('카테고리로 필터링할 수 있다', async () => {
+      const index = [
+        { id: 'v1', text: '기술 메모', metadata: { category: 'technical' }, createdAt: 1000 },
+        { id: 'v2', text: '일반 메모', metadata: { category: 'general' }, createdAt: 2000 },
+      ];
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+
+      const result = await getMemoryList({ page: 1, limit: 20, category: 'technical' });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].text).toBe('기술 메모');
+    });
+
+    it('최신순으로 정렬된다', async () => {
+      const index = [
+        { id: 'v1', text: '첫번째', createdAt: 1000 },
+        { id: 'v2', text: '두번째', createdAt: 2000 },
+      ];
+      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+
+      const result = await getMemoryList({ page: 1, limit: 20 });
+
+      expect(result.items[0].text).toBe('두번째');
+      expect(result.items[1].text).toBe('첫번째');
+    });
   });
 });

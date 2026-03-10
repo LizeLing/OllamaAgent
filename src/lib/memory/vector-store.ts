@@ -15,7 +15,7 @@ interface VectorEntry {
   createdAt: number;
 }
 
-interface IndexEntry {
+export interface IndexEntry {
   id: string;
   text: string;
   metadata?: Record<string, unknown>;
@@ -152,4 +152,36 @@ export async function purgeExpiredMemories(maxAgeDays: number = 30, maxCount: nu
 
     return toDelete.length;
   });
+}
+
+interface MemoryListOptions {
+  page: number;
+  limit: number;
+  category?: string;
+}
+
+interface MemoryListResult {
+  items: IndexEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export async function getMemoryList(options: MemoryListOptions): Promise<MemoryListResult> {
+  const { page, limit, category } = options;
+  const index = await loadIndex();
+
+  let filtered = index;
+  if (category) {
+    filtered = index.filter((e) => e.metadata?.category === category);
+  }
+
+  // 최신순 정렬
+  filtered.sort((a, b) => b.createdAt - a.createdAt);
+
+  const total = filtered.length;
+  const start = (page - 1) * limit;
+  const items = filtered.slice(start, start + limit);
+
+  return { items, total, page, limit };
 }
