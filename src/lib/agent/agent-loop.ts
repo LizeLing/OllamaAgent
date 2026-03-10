@@ -4,6 +4,9 @@ import { chat as rawChat, chatStream } from '@/lib/ollama/client';
 import { chatWithFailover } from '@/lib/ollama/failover';
 import { OllamaChatMessage } from '@/lib/ollama/types';
 import { ToolCallTracker } from './tool-call-tracker';
+import { MiddlewareChain } from './middleware/chain';
+import { ToolMiddlewareChain } from './middleware/tool-chain';
+import { MiddlewareContext } from './middleware/types';
 
 function resolveThink(
   config: AgentConfig,
@@ -27,6 +30,14 @@ export async function* runAgentLoop(
   images: string[] = [],
   abortSignal?: AbortSignal
 ): AsyncGenerator<AgentEvent> {
+  // 미들웨어 체인 초기화 (optional)
+  const chain = config.middlewares?.length
+    ? new MiddlewareChain(config.middlewares)
+    : null;
+  const toolChain = config.toolMiddlewares?.length
+    ? new ToolMiddlewareChain(config.toolMiddlewares)
+    : null;
+
   // Build system prompt with memories
   let systemPrompt = config.systemPrompt;
   if (memories.length > 0) {
@@ -44,20 +55,35 @@ export async function* runAgentLoop(
   const maxHistoryChars = 10000;
   const trimmedHistory = trimHistory(history, maxHistoryChars);
 
-  const messages: OllamaChatMessage[] = [
+  let messages: OllamaChatMessage[] = [
     { role: 'system', content: systemPrompt },
     ...trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
     userMsg,
   ];
 
+  // 미들웨어: beforeAgent
+  if (chain) {
+    let mwCtx = buildMiddlewareContext(config, messages, userMessage, history, memories);
+    mwCtx = await chain.runBeforeAgent(mwCtx);
+    messages = mwCtx.messages;
+  }
+
   const tools = toolRegistry.toOllamaTools(config.enabledTools);
   const tracker = new ToolCallTracker();
   let activeModel = config.ollamaModel;
+  let fullResponse = '';
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     if (abortSignal?.aborted) {
       yield { type: 'done', data: { iterations: iteration, model: activeModel, aborted: true } };
       return;
+    }
+
+    // 미들웨어: beforeModel (매 iteration)
+    if (chain) {
+      let mwCtx = buildMiddlewareContext(config, messages, userMessage, history, memories);
+      mwCtx = await chain.runBeforeModel(mwCtx);
+      messages = mwCtx.messages;
     }
 
     yield { type: 'thinking', data: { iteration } };
@@ -75,7 +101,21 @@ export async function* runAgentLoop(
     }
 
     const assistantMsg = response.message;
-    const toolCalls = assistantMsg.tool_calls;
+    let toolCalls = assistantMsg.tool_calls;
+
+    // 미들웨어: afterModel (toolCalls 필터링/수정)
+    if (chain && toolCalls && toolCalls.length > 0) {
+      const mwCtx = buildMiddlewareContext(config, messages, userMessage, history, memories);
+      const toolCallInfos = toolCalls.map((tc) => ({
+        name: tc.function.name,
+        arguments: tc.function.arguments,
+      }));
+      const filtered = await chain.runAfterModel(mwCtx, toolCallInfos);
+      // 필터링된 결과를 원래 toolCalls 형식으로 변환
+      toolCalls = filtered.map((info) => ({
+        function: { name: info.name, arguments: info.arguments },
+      }));
+    }
 
     if (!toolCalls || toolCalls.length === 0) {
       // No tool call -> final answer. Use chatStream with think: true for thinking tokens.
@@ -104,6 +144,7 @@ export async function* runAgentLoop(
           yield { type: 'thinking_token', data: { content: chunk.message.thinking } };
         }
         if (chunk.message?.content) {
+          fullResponse += chunk.message.content;
           yield { type: 'token', data: { content: chunk.message.content } };
         }
       }
@@ -111,6 +152,12 @@ export async function* runAgentLoop(
       if (hasThinking) {
         const thinkingDuration = Date.now() - thinkingStartTime;
         yield { type: 'thinking_token', data: { done: true, duration: thinkingDuration } };
+      }
+
+      // 미들웨어: afterAgent (fire-and-forget)
+      if (chain) {
+        const mwCtx = buildMiddlewareContext(config, messages, userMessage, history, memories);
+        chain.runAfterAgent(mwCtx, fullResponse).catch(() => {});
       }
 
       yield { type: 'done', data: {
@@ -196,12 +243,42 @@ export async function* runAgentLoop(
         yield { type: 'tool_start', data: { tool: tc.function.name, input: tc.function.arguments } };
       }
 
-      // 독립적인 도구들을 병렬 실행
+      // 독립적인 도구들을 병렬 실행 (미들웨어 적용)
       const execResults = await Promise.all(
-        pendingTools.map((tc) => toolRegistry.execute(tc.function.name, tc.function.arguments).catch((err) => ({
-          output: `도구 실행 실패: ${err instanceof Error ? err.message : 'Unknown'}`,
-          success: false,
-        })))
+        pendingTools.map(async (tc) => {
+          const toolName = tc.function.name;
+          let toolArgs = tc.function.arguments;
+
+          // 도구 미들웨어: beforeExecute
+          if (toolChain) {
+            const beforeResult = await toolChain.runBeforeExecute(toolName, toolArgs);
+            if (beforeResult.skip) {
+              return {
+                output: beforeResult.skipReason || `도구 "${toolName}" 실행이 미들웨어에 의해 건너뛰어졌습니다.`,
+                success: false,
+                skipped: true,
+              };
+            }
+            toolArgs = beforeResult.args;
+          }
+
+          let result: { success: boolean; output: string };
+          try {
+            result = await toolRegistry.execute(toolName, toolArgs);
+          } catch (err) {
+            result = {
+              output: `도구 실행 실패: ${err instanceof Error ? err.message : 'Unknown'}`,
+              success: false,
+            };
+          }
+
+          // 도구 미들웨어: afterExecute
+          if (toolChain) {
+            result = await toolChain.runAfterExecute(toolName, toolArgs, result);
+          }
+
+          return result;
+        })
       );
 
       for (let i = 0; i < pendingTools.length; i++) {
@@ -248,7 +325,31 @@ export async function* runAgentLoop(
     type: 'token',
     data: { content: '최대 반복 횟수에 도달했습니다. 작업을 완료하지 못했을 수 있습니다.' },
   };
+
+  // 미들웨어: afterAgent (fire-and-forget, max iterations 도달 시)
+  if (chain) {
+    const mwCtx = buildMiddlewareContext(config, messages, userMessage, history, memories);
+    chain.runAfterAgent(mwCtx, fullResponse).catch(() => {});
+  }
+
   yield { type: 'done', data: { iterations: config.maxIterations, model: activeModel } };
+}
+
+function buildMiddlewareContext(
+  config: AgentConfig,
+  messages: OllamaChatMessage[],
+  userMessage: string,
+  history: { role: string; content: string }[],
+  memories: string[]
+): MiddlewareContext {
+  return {
+    config,
+    messages,
+    userMessage,
+    history,
+    memories,
+    metadata: {},
+  };
 }
 
 function splitIntoChunks(text: string, chunkSize: number = 512): string[] {

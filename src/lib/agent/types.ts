@@ -43,6 +43,8 @@ export interface AgentConfig {
   format?: 'json' | Record<string, unknown>;
   thinkingMode?: 'off' | 'on' | 'auto';
   thinkingForToolCalls?: boolean;
+  middlewares?: import('./middleware/types').AgentMiddleware[];
+  toolMiddlewares?: import('./middleware/types').ToolMiddleware[];
 }
 
 export interface AgentEvent {
