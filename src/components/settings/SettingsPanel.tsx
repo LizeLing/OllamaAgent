@@ -7,6 +7,7 @@ import ModelTab from './tabs/ModelTab';
 import SecurityTab from './tabs/SecurityTab';
 import ExtensionsTab from './tabs/ExtensionsTab';
 import AutomationTab from './tabs/AutomationTab';
+import MemoryTab from './tabs/MemoryTab';
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -20,6 +21,7 @@ const SETTING_TABS = [
   { id: 'security', label: '보안', icon: '\uD83D\uDD12' },
   { id: 'extensions', label: '확장', icon: '\uD83E\uDDE9' },
   { id: 'automation', label: '자동화', icon: '\u26A1' },
+  { id: 'memory', label: '메모리', icon: '🧠' },
 ] as const;
 
 type TabId = typeof SETTING_TABS[number]['id'];
@@ -58,6 +60,8 @@ export default function SettingsPanel({ onClose, settings, onSave }: SettingsPan
         return <ExtensionsTab draft={draft} onDraftChange={handleDraftChange} />;
       case 'automation':
         return <AutomationTab />;
+      case 'memory':
+        return <MemoryTab draft={draft} onDraftChange={handleDraftChange} />;
     }
   };
 
