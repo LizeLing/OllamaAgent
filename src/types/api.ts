@@ -8,7 +8,7 @@ export interface ChatRequest {
 }
 
 export interface SSEEvent {
-  event: 'thinking' | 'tool_start' | 'tool_end' | 'token' | 'image' | 'done' | 'error';
+  event: 'thinking' | 'tool_start' | 'tool_end' | 'token' | 'image' | 'done' | 'error' | 'knowledge_search';
   data: Record<string, unknown>;
 }
 

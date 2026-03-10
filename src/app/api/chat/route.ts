@@ -7,6 +7,8 @@ import { getSkill } from '@/lib/skills/storage';
 import { runSkill } from '@/lib/skills/skill-runner';
 import { initializeTools, registerCustomTools, registerMcpTools, registerSubAgentTool } from '@/lib/tools/init';
 import { MemoryManager } from '@/lib/memory/memory-manager';
+import { KnowledgeManager } from '@/lib/knowledge/knowledge-manager';
+import type { SearchResultWithSource } from '@/types/knowledge';
 import { waitForApproval } from '@/lib/agent/approval';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/middleware/rate-limiter';
 import { HookExecutor } from '@/lib/hooks/executor';
@@ -88,6 +90,15 @@ export async function POST(request: NextRequest) {
       // RAG unavailable, continue without memories
     }
 
+    // Search knowledge base for context
+    let knowledgeSources: SearchResultWithSource[] = [];
+    try {
+      const knowledgeManager = new KnowledgeManager(settings.ollamaUrl, settings.embeddingModel);
+      knowledgeSources = await knowledgeManager.search(body.message, 5);
+    } catch {
+      // Knowledge base unavailable, continue without
+    }
+
     HookExecutor.fireAndForget('on_message_received', { message: body.message, model: requestModel });
 
     // AbortController for client disconnect detection
@@ -127,10 +138,25 @@ export async function POST(request: NextRequest) {
                 : undefined,
           };
 
+          // 지식 베이스 검색 결과를 시스템 프롬프트에 추가
+          if (knowledgeSources.length > 0) {
+            const knowledgeContext = knowledgeSources
+              .map((s, i) => `${i + 1}. [${s.filename} > ${s.source}] ${s.text.slice(0, 300)}`)
+              .join('\n');
+            agentConfig.systemPrompt += `\n\n[참조 문서]\n${knowledgeContext}\n위 참조 문서를 인용할 때 [출처: 파일명] 형식으로 표기하세요.`;
+          }
+
           const skill = body.skillId ? await getSkill(body.skillId) : null;
           const agentLoop = skill
             ? runSkill(agentConfig, skill, body.message, history, memories)
             : runAgentLoop(agentConfig, body.message, history, memories, body.images || [], abortController.signal);
+
+          // 지식 베이스 출처 정보를 클라이언트에 전달
+          if (knowledgeSources.length > 0) {
+            controller.enqueue(
+              encoder.encode(formatSSE('knowledge_search', { sources: knowledgeSources }))
+            );
+          }
 
           for await (const event of agentLoop) {
             if (abortController.signal.aborted) break;

@@ -48,6 +48,6 @@ export interface AgentConfig {
 }
 
 export interface AgentEvent {
-  type: 'thinking' | 'tool_start' | 'tool_end' | 'tool_confirm' | 'token' | 'thinking_token' | 'image' | 'done' | 'error' | 'loop_detected' | 'model_fallback' | 'skill_start' | 'skill_step' | 'skill_end' | 'subagent_start' | 'subagent_event' | 'subagent_end';
+  type: 'thinking' | 'tool_start' | 'tool_end' | 'tool_confirm' | 'token' | 'thinking_token' | 'image' | 'done' | 'error' | 'loop_detected' | 'model_fallback' | 'skill_start' | 'skill_step' | 'skill_end' | 'subagent_start' | 'subagent_event' | 'subagent_end' | 'knowledge_search';
   data: Record<string, unknown>;
 }
