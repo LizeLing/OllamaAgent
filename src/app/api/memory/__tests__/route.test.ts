@@ -2,13 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/memory/vector-store', () => ({
   getMemoryCount: vi.fn(),
+  getMemoryList: vi.fn(),
   purgeExpiredMemories: vi.fn(),
 }));
 
 import { GET, DELETE } from '../route';
-import { getMemoryCount, purgeExpiredMemories } from '@/lib/memory/vector-store';
+import { getMemoryCount, getMemoryList, purgeExpiredMemories } from '@/lib/memory/vector-store';
 
 const mockGetMemoryCount = vi.mocked(getMemoryCount);
+const mockGetMemoryList = vi.mocked(getMemoryList);
 const mockPurgeExpired = vi.mocked(purgeExpiredMemories);
 
 describe('API /api/memory', () => {
@@ -20,7 +22,7 @@ describe('API /api/memory', () => {
     it('returns memory count', async () => {
       mockGetMemoryCount.mockResolvedValue(42 as never);
 
-      const res = await GET();
+      const res = await GET(new Request('http://localhost/api/memory'));
       const json = await res.json();
 
       expect(mockGetMemoryCount).toHaveBeenCalled();
@@ -30,11 +32,52 @@ describe('API /api/memory', () => {
     it('returns 500 on error', async () => {
       mockGetMemoryCount.mockRejectedValue(new Error('DB error'));
 
-      const res = await GET();
+      const res = await GET(new Request('http://localhost/api/memory'));
       const json = await res.json();
 
       expect(res.status).toBe(500);
-      expect(json.error).toBe('Failed to get memory count');
+      expect(json.error).toBe('Failed to get memories');
+    });
+  });
+
+  describe('GET /api/memory?list=true', () => {
+    it('list=true이면 페이지네이션된 메모리 목록을 반환한다', async () => {
+      mockGetMemoryList.mockResolvedValue({
+        items: [], total: 0, page: 1, limit: 20,
+      } as never);
+
+      const req = new Request('http://localhost/api/memory?list=true&page=1&limit=20');
+      const res = await GET(req);
+      const data = await res.json();
+
+      expect(mockGetMemoryList).toHaveBeenCalledWith({ page: 1, limit: 20, category: undefined });
+      expect(data).toHaveProperty('items');
+      expect(data).toHaveProperty('total');
+      expect(data).toHaveProperty('page');
+    });
+
+    it('category 파라미터로 필터링한다', async () => {
+      mockGetMemoryList.mockResolvedValue({
+        items: [], total: 0, page: 1, limit: 20,
+      } as never);
+
+      const req = new Request('http://localhost/api/memory?list=true&category=technical');
+      const res = await GET(req);
+
+      expect(mockGetMemoryList).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'technical' })
+      );
+    });
+
+    it('list 파라미터 없으면 기존 count만 반환한다', async () => {
+      mockGetMemoryCount.mockResolvedValue(42 as never);
+
+      const req = new Request('http://localhost/api/memory');
+      const res = await GET(req);
+      const data = await res.json();
+
+      expect(data).toHaveProperty('count');
+      expect(data).not.toHaveProperty('items');
     });
   });
 
