@@ -84,9 +84,10 @@ export default function MemoryTab({ draft, onDraftChange }: MemoryTabProps) {
 
   const handleDeleteOne = async (id: string) => {
     await fetch(`/api/memory/${id}`, { method: 'DELETE' });
+    const next = new Set(selectedIds);
+    next.delete(id);
+    setSelectedIds(next);
     fetchMemories();
-    selectedIds.delete(id);
-    setSelectedIds(new Set(selectedIds));
   };
 
   const handleBulkDelete = async () => {
