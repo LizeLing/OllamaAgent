@@ -3,12 +3,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import SettingsPanel from '../SettingsPanel';
 import { Settings } from '@/types/settings';
 
-vi.mock('../SystemPromptEditor', () => ({ default: () => <div data-testid="system-prompt-editor" /> }));
-vi.mock('../PathConfigEditor', () => ({ default: () => <div data-testid="path-config" /> }));
-vi.mock('../PresetSelector', () => ({ default: () => <div data-testid="preset-selector" /> }));
-vi.mock('../CustomToolEditor', () => ({ default: () => <div data-testid="custom-tool-editor" /> }));
-vi.mock('../McpServerManager', () => ({ default: () => <div data-testid="mcp-manager" /> }));
-vi.mock('../ModelOptionsSliders', () => ({ default: () => <div data-testid="model-sliders" /> }));
+vi.mock('../tabs/GeneralTab', () => ({ default: () => <div data-testid="general-tab" /> }));
+vi.mock('../tabs/ModelTab', () => ({ default: () => <div data-testid="model-tab" /> }));
+vi.mock('../tabs/SecurityTab', () => ({ default: () => <div data-testid="security-tab" /> }));
+vi.mock('../tabs/ExtensionsTab', () => ({ default: () => <div data-testid="extensions-tab" /> }));
+vi.mock('../tabs/AutomationTab', () => ({ default: () => <div data-testid="automation-tab" /> }));
 
 const settings: Settings = {
   systemPrompt: 'test prompt',
@@ -32,47 +31,45 @@ const settings: Settings = {
   thinkingForToolCalls: false,
   webSearchProvider: 'searxng',
   ollamaApiKey: '',
+  enabledTools: [],
+  numParallel: 1,
+  maxLoadedModels: 1,
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  global.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve({ models: [], voices: [] }) });
 });
 
 describe('SettingsPanel', () => {
-  it('returns null when not open', () => {
-    const { container } = render(<SettingsPanel isOpen={false} onClose={vi.fn()} settings={settings} onSave={vi.fn()} />);
+  it('returns null when settings is null', () => {
+    const { container } = render(<SettingsPanel onClose={vi.fn()} settings={null} onSave={vi.fn()} />);
     expect(container.innerHTML).toBe('');
   });
 
-  it('renders when open', () => {
-    render(<SettingsPanel isOpen={true} onClose={vi.fn()} settings={settings} onSave={vi.fn()} />);
+  it('renders when settings provided', () => {
+    render(<SettingsPanel onClose={vi.fn()} settings={settings} onSave={vi.fn()} />);
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getByText('Save Settings')).toBeInTheDocument();
   });
 
   it('calls onClose when close button clicked', () => {
     const onClose = vi.fn();
-    const { container } = render(<SettingsPanel isOpen={true} onClose={onClose} settings={settings} onSave={vi.fn()} />);
-    // Find the close button (the one next to the Settings heading)
-    const closeBtn = container.querySelector('button');
-    fireEvent.click(closeBtn!);
-    // onClose is called via backdrop or close button
+    render(<SettingsPanel onClose={onClose} settings={settings} onSave={vi.fn()} />);
+    const closeBtn = screen.getByText('돌아가기');
+    fireEvent.click(closeBtn);
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('calls onSave when save button clicked', async () => {
+  it('calls onSave when save button clicked', () => {
     const onSave = vi.fn().mockResolvedValue(true);
-    const { container } = render(<SettingsPanel isOpen={true} onClose={vi.fn()} settings={settings} onSave={onSave} />);
-    const buttons = container.querySelectorAll('button');
-    const saveBtn = Array.from(buttons).find(b => b.textContent?.includes('Save Settings'));
-    fireEvent.click(saveBtn!);
+    render(<SettingsPanel onClose={vi.fn()} settings={settings} onSave={onSave} />);
+    const saveBtn = screen.getByText('Save Settings');
+    fireEvent.click(saveBtn);
     expect(onSave).toHaveBeenCalled();
   });
 
-  it('renders settings sub-components', () => {
-    const { container } = render(<SettingsPanel isOpen={true} onClose={vi.fn()} settings={settings} onSave={vi.fn()} />);
-    expect(container.querySelector('[data-testid="preset-selector"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="model-sliders"]')).toBeTruthy();
+  it('renders general tab by default', () => {
+    const { container } = render(<SettingsPanel onClose={vi.fn()} settings={settings} onSave={vi.fn()} />);
+    expect(container.querySelector('[data-testid="general-tab"]')).toBeTruthy();
   });
 });

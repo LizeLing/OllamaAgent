@@ -10,6 +10,7 @@ import { MemoryManager } from '@/lib/memory/memory-manager';
 import { waitForApproval } from '@/lib/agent/approval';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/middleware/rate-limiter';
 import { HookExecutor } from '@/lib/hooks/executor';
+import { logger, getErrorMessage } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
@@ -73,16 +74,25 @@ export async function POST(request: NextRequest) {
       content: m.content,
     }));
 
-    // Search memories for context
+    // Search memories for context (인스턴스를 한 번만 생성하여 재사용)
+    let memoryManager: MemoryManager | null = null;
     let memories: string[] = [];
     try {
-      const memoryManager = new MemoryManager(settings.ollamaUrl, settings.embeddingModel);
+      memoryManager = new MemoryManager(settings.ollamaUrl, settings.embeddingModel);
       memories = await memoryManager.searchMemories(body.message, 3);
     } catch {
       // RAG unavailable, continue without memories
     }
 
     HookExecutor.fireAndForget('on_message_received', { message: body.message, model: requestModel });
+
+    // AbortController for client disconnect detection
+    const abortController = new AbortController();
+    try {
+      request.signal.addEventListener('abort', () => abortController.abort());
+    } catch {
+      // 테스트 환경 등에서 signal이 없을 수 있음
+    }
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -116,9 +126,11 @@ export async function POST(request: NextRequest) {
           const skill = body.skillId ? await getSkill(body.skillId) : null;
           const agentLoop = skill
             ? runSkill(agentConfig, skill, body.message, history, memories)
-            : runAgentLoop(agentConfig, body.message, history, memories, body.images || []);
+            : runAgentLoop(agentConfig, body.message, history, memories, body.images || [], abortController.signal);
 
           for await (const event of agentLoop) {
+            if (abortController.signal.aborted) break;
+
             if (event.type === 'token') {
               fullResponse += event.data.content as string;
             }
@@ -137,12 +149,11 @@ export async function POST(request: NextRequest) {
           }
 
           // Save conversation to memory (async, don't block)
-          if (fullResponse.length > 20) {
-            const memoryManager = new MemoryManager(settings.ollamaUrl, settings.embeddingModel);
+          if (fullResponse.length > 20 && memoryManager) {
             memoryManager.saveConversationSummary(body.message, fullResponse).catch(() => {});
           }
         } catch (error) {
-          const msg = error instanceof Error ? error.message : 'Unknown error';
+          const msg = getErrorMessage(error);
           controller.enqueue(
             encoder.encode(formatSSE('error', { message: msg }))
           );
@@ -160,8 +171,8 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[CHAT_ERROR]', error instanceof Error ? error.message : error);
-    const msg = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('CHAT', 'Request handling failed', error);
+    const msg = getErrorMessage(error);
     const errorStream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(formatSSE('error', { message: msg })));

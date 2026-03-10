@@ -7,17 +7,18 @@ import { useConversations } from '@/hooks/useConversations';
 import { addToast } from '@/hooks/useToast';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
+import ChatHeader from './ChatHeader';
 import SettingsPanel from '@/components/settings/SettingsPanel';
 import SkillEditor from '@/components/settings/SkillEditor';
 import CronJobEditor from '@/components/settings/CronJobEditor';
 import HelpTooltip from '@/components/ui/HelpTooltip';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
 import ShortcutGuide from '@/components/ui/ShortcutGuide';
 import StatsPanel from '@/components/ui/StatsPanel';
 import ToolLogPanel from '@/components/ui/ToolLogPanel';
-import { COMMANDS } from '@/lib/commands/definitions';
+import { useCommands } from './useCommands';
+import { useDragDrop } from './useDragDrop';
 
 export default function ChatContainer() {
   const {
@@ -58,18 +59,28 @@ export default function ChatContainer() {
   const [activeView, setActiveView] = useState<'chat' | 'settings' | 'skills' | 'cron'>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Set initial sidebar state based on screen size after hydration
+  // 화면 크기에 따른 사이드바 상태 + 리사이즈 감지
   useEffect(() => {
-    setSidebarOpen(window.matchMedia('(min-width: 768px)').matches);
+    const mq = window.matchMedia('(min-width: 768px)');
+    setSidebarOpen(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [toolLogOpen, setToolLogOpen] = useState(false);
-  const [isDragOverPage, setIsDragOverPage] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const prevMessagesLenRef = useRef(0);
-  const dragCounterRef = useRef(0);
+  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 타이머 cleanup
+  useEffect(() => {
+    return () => {
+      if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    };
+  }, []);
 
   // Save messages to server after assistant response completes
   useEffect(() => {
@@ -148,7 +159,7 @@ export default function ChatContainer() {
     await sendMessage(content, images, selectedModel || undefined);
 
     if (messages.length === 0 && currentConvId) {
-      setTimeout(async () => {
+      const timerId = setTimeout(async () => {
         try {
           const res = await fetch(`/api/conversations/${currentConvId}/title`, {
             method: 'POST',
@@ -160,6 +171,7 @@ export default function ChatContainer() {
           // Title auto-generation failed, non-critical
         }
       }, 2000);
+      titleTimerRef.current = timerId;
     }
   }, [conversationId, createConversation, setConversationId, setActiveId, sendMessage, messages.length, fetchConversations, selectedModel]);
 
@@ -193,37 +205,6 @@ export default function ChatContainer() {
     }
   }, [messages, conversationId, createConversation, setConversationId, setActiveId, loadConversation, fetchConversations]);
 
-  const handleFileDrop = useCallback(async (files: FileList) => {
-    for (const file of Array.from(files).slice(0, 5)) {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-        if (res.status === 429) {
-          addToast('warning', '업로드 요청이 너무 많습니다.');
-          return;
-        }
-        if (res.ok) {
-          const data = await res.json();
-          if (data.content) {
-            handleSend(`파일 "${data.originalName}"의 내용입니다:\n\n\`\`\`\n${data.content}\n\`\`\``);
-          } else if (data.imageBase64) {
-            handleSend(`이미지 "${data.originalName}"을 분석해주세요.`, [data.imageBase64]);
-          } else {
-            handleSend(`파일 "${data.originalName}"을 업로드했습니다. (경로: ${data.path})`);
-          }
-        } else {
-          const err = await res.json().catch(() => ({ error: 'Upload failed' }));
-          addToast('error', err.error || '업로드 실패');
-        }
-      } catch (err) {
-        console.error('[handleFileDrop]', err);
-        addToast('error', '파일 업로드에 실패했습니다.');
-      }
-    }
-  }, [handleSend]);
-
   const handleExport = useCallback(async (id: string, format: 'json' | 'markdown') => {
     try {
       const res = await fetch(`/api/conversations/${id}/export?format=${format}`);
@@ -242,132 +223,32 @@ export default function ChatContainer() {
     }
   }, []);
 
-  const handleCommand = useCallback((name: string, args: string[]) => {
-    switch (name) {
-      case 'new':
-        handleNewChat();
-        break;
-      case 'clear':
-        clearMessages();
-        addSystemMessage('대화가 초기화되었습니다.');
-        break;
-      case 'model':
-        if (args[0]) {
-          setSelectedModel(args[0]);
-          addSystemMessage(`모델이 ${args[0]}으로 변경되었습니다.`);
-        } else {
-          addSystemMessage(`현재 모델: ${selectedModel || settings?.ollamaModel || '없음'}\n사용 가능: ${availableModels.join(', ')}`);
-        }
-        break;
-      case 'help': {
-        const helpText = COMMANDS.map(
-          (c) => `**/${c.name}** — ${c.description}`
-        ).join('\n');
-        addSystemMessage(`## 명령어 목록\n\n${helpText}`);
-        break;
-      }
-      case 'stats': {
-        const totalTokens = messages.reduce(
-          (sum, m) => sum + (m.tokenUsage?.totalTokens || 0), 0
-        );
-        addSystemMessage(
-          `## 세션 통계\n\n` +
-          `- 메시지 수: ${messages.length}\n` +
-          `- 총 토큰: ${totalTokens}\n` +
-          `- 모델: ${selectedModel || settings?.ollamaModel || '없음'}\n` +
-          `- 대화 ID: ${conversationId || '없음'}`
-        );
-        break;
-      }
-      case 'export':
-        if (activeId) {
-          handleExport(activeId, (args[0] as 'json' | 'markdown') || 'json');
-        } else {
-          addSystemMessage('내보낼 대화가 없습니다.');
-        }
-        break;
-      case 'system':
-        if (args[0]) {
-          fetch('/api/settings', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ systemPrompt: args[0] }),
-          }).then(() => {
-            addSystemMessage(`시스템 프롬프트가 변경되었습니다.`);
-          }).catch(() => {
-            addSystemMessage('시스템 프롬프트 변경에 실패했습니다.');
-          });
-        }
-        break;
-      case 'skill':
-        if (args[0]) {
-          // 스킬 이름으로 실행
-          fetch('/api/skills')
-            .then((r) => r.json())
-            .then((data) => {
-              const skills: Array<{ id: string; name: string; triggerCommand?: string; icon?: string; description: string }> = data.skills || data;
-              const skill = skills.find(
-                (s) => s.triggerCommand === args[0] || s.name === args[0] || s.id === args[0]
-              );
-              if (skill) {
-                addSystemMessage(`스킬 "${skill.icon || '📋'} ${skill.name}" 실행 중...`);
-                handleSend(`[스킬 실행: ${skill.name}] ${args.slice(1).join(' ') || skill.description}`);
-              } else {
-                addSystemMessage(`스킬 "${args[0]}"을 찾을 수 없습니다.`);
-              }
-            })
-            .catch(() => addSystemMessage('스킬 목록을 불러올 수 없습니다.'));
-        } else {
-          // 스킬 목록 표시
-          fetch('/api/skills')
-            .then((r) => r.json())
-            .then((data) => {
-              const skills: Array<{ icon?: string; name: string; triggerCommand?: string; description: string; workflow: unknown[] }> = data.skills || data;
-              if (skills.length === 0) {
-                addSystemMessage('등록된 스킬이 없습니다.');
-              } else {
-                const list = skills.map(
-                  (s) => `- ${s.icon || '📋'} **${s.name}**${s.triggerCommand ? ` (\`/skill ${s.triggerCommand}\`)` : ''} — ${s.description} (${s.workflow.length}단계)`
-                ).join('\n');
-                addSystemMessage(`## 사용 가능한 스킬\n\n${list}\n\n실행: \`/skill <이름>\``);
-              }
-            })
-            .catch(() => addSystemMessage('스킬 목록을 불러올 수 없습니다.'));
-        }
-        break;
-    }
-  }, [handleNewChat, clearMessages, addSystemMessage, selectedModel, settings, availableModels, messages, conversationId, activeId, handleExport, handleSend]);
+  const { handleCommand } = useCommands({
+    handleNewChat,
+    clearMessages,
+    addSystemMessage,
+    selectedModel,
+    ollamaModel: settings?.ollamaModel || '',
+    availableModels,
+    messages,
+    conversationId,
+    activeId,
+    handleExport,
+    handleSend,
+    setSelectedModel,
+  });
 
   const handleImport = useCallback(() => {
     fetchConversations();
   }, [fetchConversations]);
 
-  // Page-level drag overlay
-  const handlePageDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounterRef.current++;
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsDragOverPage(true);
-    }
-  }, []);
-
-  const handlePageDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounterRef.current--;
-    if (dragCounterRef.current === 0) {
-      setIsDragOverPage(false);
-    }
-  }, []);
-
-  const handlePageDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    dragCounterRef.current = 0;
-    setIsDragOverPage(false);
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFileDrop(files);
-    }
-  }, [handleFileDrop]);
+  const {
+    isDragOverPage,
+    handleFileDrop,
+    handlePageDragEnter,
+    handlePageDragLeave,
+    handlePageDrop,
+  } = useDragDrop(handleSend);
 
   // Touch swipe to open sidebar on mobile
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -435,85 +316,20 @@ export default function ChatContainer() {
         )}
 
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen((prev) => !prev)}
-              className="p-1.5 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
-              title="사이드바 토글"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
-            <span className="text-xl">🤖</span>
-            <h1 className="text-base font-semibold">OllamaAgent</h1>
-            <select
-              value={selectedModel || settings?.ollamaModel || ''}
-              onChange={(e) => setSelectedModel(e.target.value || null)}
-              className="text-[10px] text-muted bg-card px-1.5 py-0.5 rounded border-none outline-none cursor-pointer"
-              title="모델 선택"
-            >
-              {availableModels.length > 0 ? (
-                availableModels.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))
-              ) : (
-                <option value={settings?.ollamaModel || ''}>{settings?.ollamaModel || 'loading...'}</option>
-              )}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            {isLoading && (
-              <button
-                onClick={stopGeneration}
-                className="px-3 py-1.5 text-xs bg-error/20 text-error rounded-lg hover:bg-error/30 transition-colors"
-              >
-                Stop <span className="text-[10px] opacity-60 ml-1">ESC</span>
-              </button>
-            )}
-            <button
-              onClick={handleNewChat}
-              className="px-3 py-1.5 text-xs bg-card text-muted rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
-            >
-              New Chat
-            </button>
-            <ThemeToggle />
-            <button
-              onClick={() => setToolLogOpen(true)}
-              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
-              title="도구 로그"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setStatsOpen(true)}
-              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
-              title="통계"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10" />
-                <line x1="12" y1="20" x2="12" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="14" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setShortcutGuideOpen(true)}
-              className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
-              title="단축키 (?)"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </button>
-          </div>
-        </header>
+        <ChatHeader
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          selectedModel={selectedModel}
+          ollamaModel={settings?.ollamaModel || ''}
+          availableModels={availableModels}
+          onModelChange={setSelectedModel}
+          isLoading={isLoading}
+          onStop={stopGeneration}
+          onNewChat={handleNewChat}
+          onOpenToolLog={() => setToolLogOpen(true)}
+          onOpenStats={() => setStatsOpen(true)}
+          onOpenShortcuts={() => setShortcutGuideOpen(true)}
+        />
 
         {activeView === 'settings' ? (
           <SettingsPanel

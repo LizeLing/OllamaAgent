@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getHookLogs, clearHookLogs } from '@/lib/hooks/log';
+import { logger, getErrorMessage } from '@/lib/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     const logs = await getHookLogs(hookId, limit);
     return NextResponse.json(logs);
   } catch (error) {
-    console.error('[HOOK_LOGS_ERROR]', error instanceof Error ? error.message : error);
+    logger.error('HOOK_LOGS', 'Failed to get hook logs', getErrorMessage(error));
     return NextResponse.json({ error: 'Failed to get hook logs' }, { status: 500 });
   }
 }
@@ -20,7 +21,7 @@ export async function DELETE() {
     await clearHookLogs();
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[HOOK_LOGS_CLEAR_ERROR]', error instanceof Error ? error.message : error);
+    logger.error('HOOK_LOGS', 'Failed to clear hook logs', getErrorMessage(error));
     return NextResponse.json({ error: 'Failed to clear hook logs' }, { status: 500 });
   }
 }

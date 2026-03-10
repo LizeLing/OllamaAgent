@@ -44,6 +44,12 @@ yarn-error.log*
 /data/conversations/
 /data/folders.json
 
+# logs
+/data/logs/
+
+# claude code local
+.claude/
+
 # worktrees
 .worktrees/
 

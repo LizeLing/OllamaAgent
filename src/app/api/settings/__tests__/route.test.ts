@@ -60,7 +60,7 @@ describe('API /api/settings', () => {
       const json = await res.json();
 
       expect(res.status).toBe(500);
-      expect(json.error).toBe('Disk full');
+      expect(json.error).toBe('Internal server error');
     });
 
     it('returns 500 with generic message on non-Error failure', async () => {
@@ -75,7 +75,7 @@ describe('API /api/settings', () => {
       const json = await res.json();
 
       expect(res.status).toBe(500);
-      expect(json.error).toBe('Failed to save settings');
+      expect(json.error).toBe('Internal server error');
     });
   });
 });

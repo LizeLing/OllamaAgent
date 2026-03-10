@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJobs, updateJob, removeJob, loadHistory } from '@/lib/cron/storage';
 import { isValidCronExpression, getNextRunTime, describeCron } from '@/lib/cron/parser';
+import { withErrorHandler } from '@/lib/api/handler';
 
-export async function GET(
+export const GET = withErrorHandler('CRON', async (
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params;
   const jobs = await loadJobs();
   const job = jobs.find((j) => j.id === id);
@@ -20,12 +21,12 @@ export async function GET(
     cronDescription: describeCron(job.cronExpression),
     history,
   });
-}
+});
 
-export async function PUT(
+export const PUT = withErrorHandler('CRON', async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params;
   const body = await request.json();
 
@@ -43,16 +44,16 @@ export async function PUT(
   }
 
   return NextResponse.json(updated);
-}
+});
 
-export async function DELETE(
+export const DELETE = withErrorHandler('CRON', async (
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params;
   const removed = await removeJob(id);
   if (!removed) {
     return NextResponse.json({ error: '작업을 찾을 수 없습니다.' }, { status: 404 });
   }
   return NextResponse.json({ success: true });
-}
+});

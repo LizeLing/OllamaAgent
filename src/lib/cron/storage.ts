@@ -1,7 +1,8 @@
 import { CronJob, CronRunResult } from '@/types/cron';
 import { DATA_DIR } from '@/lib/config/constants';
 import { getNextRunTime } from './parser';
-import fs from 'fs/promises';
+import { atomicWriteJSON, safeReadJSON } from '@/lib/storage/atomic-write';
+import { withFileLock } from '@/lib/storage/file-lock';
 import path from 'path';
 
 const JOBS_FILE = path.join(DATA_DIR, 'cron-jobs.json');
@@ -42,83 +43,75 @@ const DEFAULT_JOBS: CronJob[] = [
   },
 ];
 
-async function ensureDir() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-}
-
 export async function loadJobs(): Promise<CronJob[]> {
-  try {
-    const data = await fs.readFile(JOBS_FILE, 'utf-8');
-    const jobs = JSON.parse(data) as CronJob[];
-    return jobs;
-  } catch {
-    // First access: seed defaults
-    const jobs = DEFAULT_JOBS.map((j) => ({
-      ...j,
-      nextRunAt: getNextRunTime(j.cronExpression),
-    }));
-    await saveJobs(jobs);
-    return jobs;
-  }
+  const jobs = await safeReadJSON<CronJob[] | null>(JOBS_FILE, null);
+  if (jobs !== null) return jobs;
+  // First access: seed defaults
+  const defaults = DEFAULT_JOBS.map((j) => ({
+    ...j,
+    nextRunAt: getNextRunTime(j.cronExpression),
+  }));
+  await saveJobs(defaults);
+  return defaults;
 }
 
 export async function saveJobs(jobs: CronJob[]): Promise<void> {
-  await ensureDir();
-  await fs.writeFile(JOBS_FILE, JSON.stringify(jobs, null, 2));
+  await atomicWriteJSON(JOBS_FILE, jobs);
 }
 
 export async function addJob(job: CronJob): Promise<void> {
-  const jobs = await loadJobs();
-  if (jobs.length >= MAX_JOBS) {
-    throw new Error(`최대 ${MAX_JOBS}개의 작업만 등록할 수 있습니다.`);
-  }
-  jobs.push(job);
-  await saveJobs(jobs);
+  return withFileLock(JOBS_FILE, async () => {
+    const jobs = await loadJobs();
+    if (jobs.length >= MAX_JOBS) {
+      throw new Error(`최대 ${MAX_JOBS}개의 작업만 등록할 수 있습니다.`);
+    }
+    jobs.push(job);
+    await saveJobs(jobs);
+  });
 }
 
 export async function updateJob(id: string, updates: Partial<CronJob>): Promise<CronJob | null> {
-  const jobs = await loadJobs();
-  const idx = jobs.findIndex((j) => j.id === id);
-  if (idx === -1) return null;
-  jobs[idx] = { ...jobs[idx], ...updates };
-  await saveJobs(jobs);
-  return jobs[idx];
+  return withFileLock(JOBS_FILE, async () => {
+    const jobs = await loadJobs();
+    const idx = jobs.findIndex((j) => j.id === id);
+    if (idx === -1) return null;
+    jobs[idx] = { ...jobs[idx], ...updates };
+    await saveJobs(jobs);
+    return jobs[idx];
+  });
 }
 
 export async function removeJob(id: string): Promise<boolean> {
-  const jobs = await loadJobs();
-  const idx = jobs.findIndex((j) => j.id === id);
-  if (idx === -1) return false;
-  jobs.splice(idx, 1);
-  await saveJobs(jobs);
-  return true;
+  return withFileLock(JOBS_FILE, async () => {
+    const jobs = await loadJobs();
+    const idx = jobs.findIndex((j) => j.id === id);
+    if (idx === -1) return false;
+    jobs.splice(idx, 1);
+    await saveJobs(jobs);
+    return true;
+  });
 }
 
 export async function appendHistory(result: CronRunResult): Promise<void> {
-  const history = await loadHistory();
-  history.push(result);
-  // Ring buffer: keep only the latest entries
-  while (history.length > MAX_HISTORY) {
-    history.shift();
-  }
-  await ensureDir();
-  await fs.writeFile(HISTORY_FILE, JSON.stringify(history, null, 2));
+  return withFileLock(HISTORY_FILE, async () => {
+    const history = await loadHistory();
+    history.push(result);
+    // Ring buffer: keep only the latest entries
+    while (history.length > MAX_HISTORY) {
+      history.shift();
+    }
+    await atomicWriteJSON(HISTORY_FILE, history);
+  });
 }
 
 export async function loadHistory(jobId?: string): Promise<CronRunResult[]> {
-  try {
-    const data = await fs.readFile(HISTORY_FILE, 'utf-8');
-    const history = JSON.parse(data) as CronRunResult[];
-    if (jobId) {
-      return history.filter((r) => r.jobId === jobId);
-    }
-    return history;
-  } catch {
-    return [];
+  const history = await safeReadJSON<CronRunResult[]>(HISTORY_FILE, []);
+  if (jobId) {
+    return history.filter((r) => r.jobId === jobId);
   }
+  return history;
 }
 
 export async function clearHistory(): Promise<void> {
-  await ensureDir();
-  await fs.writeFile(HISTORY_FILE, JSON.stringify([]));
+  await atomicWriteJSON(HISTORY_FILE, []);
 }

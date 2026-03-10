@@ -108,9 +108,9 @@ describe('ChatContainer', () => {
     expect(() => fireEvent.click(toggleBtns[0])).not.toThrow();
   });
 
-  it('renders settings button', () => {
+  it('renders sidebar toggle button', () => {
     render(<ChatContainer />);
-    const btns = screen.getAllByTitle('Settings (Cmd+,)');
-    expect(btns.length).toBeGreaterThanOrEqual(1);
+    const toggleBtns = screen.getAllByTitle('사이드바 토글');
+    expect(toggleBtns.length).toBeGreaterThanOrEqual(1);
   });
 });

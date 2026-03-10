@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { loadSettings } from '@/lib/config/settings';
 import { checkHealth } from '@/lib/ollama/client';
 import { HealthStatus } from '@/types/api';
+import { withErrorHandler } from '@/lib/api/handler';
+import { TIMEOUTS } from '@/lib/config/timeouts';
 
-export async function GET() {
+export const GET = withErrorHandler('HEALTH', async () => {
   const settings = await loadSettings();
 
   const [ollama, searxng, docker] = await Promise.all([
@@ -12,7 +14,6 @@ export async function GET() {
     checkDocker(),
   ]);
 
-  // Check embedding model by attempting a small embed
   let embedding = false;
   if (ollama) {
     try {
@@ -20,7 +21,7 @@ export async function GET() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: settings.embeddingModel, input: 'test' }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(TIMEOUTS.EMBEDDING),
       });
       embedding = res.ok;
     } catch {
@@ -33,16 +34,16 @@ export async function GET() {
     searxng,
     docker,
     embedding,
-    stt: false, // Can't easily check without audio
-    tts: false, // Can't easily check without running python
+    stt: false,
+    tts: false,
   };
 
   return NextResponse.json(status);
-}
+});
 
 async function checkSearxng(url: string): Promise<boolean> {
   try {
-    const res = await fetch(`${url}/healthz`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${url}/healthz`, { signal: AbortSignal.timeout(TIMEOUTS.HEALTH_CHECK) });
     return res.ok;
   } catch {
     return false;
@@ -51,10 +52,9 @@ async function checkSearxng(url: string): Promise<boolean> {
 
 async function checkDocker(): Promise<boolean> {
   try {
-    const res = await fetch('http://localhost:2375/_ping', { signal: AbortSignal.timeout(2000) });
+    const res = await fetch('http://localhost:2375/_ping', { signal: AbortSignal.timeout(TIMEOUTS.DOCKER_PING) });
     return res.ok;
   } catch {
-    // Try unix socket via Docker SDK (already imported in code-executor)
     try {
       const Docker = (await import('dockerode')).default;
       const docker = new Docker();

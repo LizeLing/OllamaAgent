@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJobs } from '@/lib/cron/storage';
 import { startScheduler, stopScheduler, isSchedulerRunning } from '@/lib/cron/scheduler';
+import { withErrorHandler } from '@/lib/api/handler';
+import { cronStatusActionSchema } from '@/lib/api/schemas';
 
-export async function GET() {
+export const GET = withErrorHandler('CRON_STATUS', async () => {
   const jobs = await loadJobs();
   const enabledCount = jobs.filter((j) => j.enabled).length;
 
@@ -11,19 +13,17 @@ export async function GET() {
     jobCount: jobs.length,
     enabledCount,
   });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler('CRON_STATUS', async (request: NextRequest) => {
   const body = await request.json();
-  const { action } = body;
+  const { action } = cronStatusActionSchema.parse(body);
 
   if (action === 'start') {
     startScheduler();
-  } else if (action === 'stop') {
-    stopScheduler();
   } else {
-    return NextResponse.json({ error: 'action은 "start" 또는 "stop"이어야 합니다.' }, { status: 400 });
+    stopScheduler();
   }
 
   return NextResponse.json({ running: isSchedulerRunning() });
-}
+});

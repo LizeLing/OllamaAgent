@@ -6,7 +6,7 @@ export function killOllama(): void {
 
 export function startOllama(env: Record<string, string>): void {
   const child = spawn('ollama', ['serve'], {
-    env,
+    env: { ...process.env, ...env },
     detached: true,
     stdio: 'ignore',
   });

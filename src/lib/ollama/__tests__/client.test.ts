@@ -216,7 +216,7 @@ describe('Ollama Client', () => {
   });
 
   describe('fetchWithRetry()', () => {
-    it('네트워크 오류 시 최대 2회 재시도한다 (backoff 1s→2s)', async () => {
+    it('네트워크 오류 시 최대 2회 재시도한다 (지수 백오프)', async () => {
       vi.useFakeTimers();
       mockFetch
         .mockRejectedValueOnce(new Error('network'))
@@ -224,10 +224,9 @@ describe('Ollama Client', () => {
         .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ done: true }) });
 
       const promise = chat('http://localhost:11434', { model: 'test', messages: [] });
-      // First retry: 1s delay
-      await vi.advanceTimersByTimeAsync(1000);
-      // Second retry: 2s delay
-      await vi.advanceTimersByTimeAsync(2000);
+      // 지수 백오프: 첫 재시도 ~1s + jitter, 두 번째 ~2s + jitter
+      await vi.advanceTimersByTimeAsync(2000);  // 첫 재시도 (1s backoff + jitter)
+      await vi.advanceTimersByTimeAsync(4000);  // 두 번째 재시도 (2s backoff + jitter)
 
       await expect(promise).resolves.toBeDefined();
       expect(mockFetch).toHaveBeenCalledTimes(3);
@@ -239,7 +238,7 @@ describe('Ollama Client', () => {
 
       await expect(chat('http://localhost:11434', { model: 'test', messages: [] }))
         .rejects.toThrow('Ollama API error');
-    });
+    }, 15000);
   });
 
   describe('embed()', () => {

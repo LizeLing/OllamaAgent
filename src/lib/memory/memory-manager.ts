@@ -1,5 +1,6 @@
 import { getEmbedding } from './embedder';
 import { addVector, searchVectors, purgeExpiredMemories, getMemoryCount } from './vector-store';
+import { logger } from '@/lib/logger';
 
 export class MemoryManager {
   constructor(
@@ -12,7 +13,7 @@ export class MemoryManager {
       const vector = await getEmbedding(this.ollamaUrl, this.embeddingModel, text);
       return await addVector(text, vector, metadata);
     } catch (err) {
-      console.error('Failed to save memory:', err);
+      logger.error('MEMORY', 'Failed to save memory', err);
       throw err;
     }
   }
@@ -23,7 +24,7 @@ export class MemoryManager {
       const results = await searchVectors(queryVector, topK);
       return results.map((r) => r.text);
     } catch (err) {
-      console.error('Failed to search memories:', err);
+      logger.error('MEMORY', 'Failed to search memories', err);
       return [];
     }
   }

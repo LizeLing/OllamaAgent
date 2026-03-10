@@ -38,7 +38,7 @@ describe('getCompletions', () => {
   it('/ 입력 시 전체 명령어 목록을 반환한다', () => {
     const result = getCompletions('/');
     expect(result).toEqual(COMMANDS);
-    expect(result).toHaveLength(7);
+    expect(result).toHaveLength(COMMANDS.length);
   });
 
   it('/mo 입력 시 /model을 포함한다', () => {

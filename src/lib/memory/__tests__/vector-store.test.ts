@@ -19,6 +19,19 @@ vi.mock('@/lib/config/constants', () => ({
   DATA_DIR: '/tmp/test-data',
 }));
 
+const mockAtomicWriteJSON = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/storage/atomic-write', () => ({
+  atomicWriteJSON: (...args: unknown[]) => mockAtomicWriteJSON(...args),
+}));
+
+vi.mock('@/lib/storage/file-lock', () => ({
+  withFileLock: (_key: string, fn: () => Promise<unknown>) => fn(),
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 describe('Vector Store', () => {
   let addVector: typeof import('../vector-store').addVector;
   let searchVectors: typeof import('../vector-store').searchVectors;
@@ -34,6 +47,7 @@ describe('Vector Store', () => {
     mockFs.writeFile.mockResolvedValue(undefined);
     mockFs.mkdir.mockResolvedValue(undefined);
     mockFs.unlink.mockResolvedValue(undefined);
+    mockAtomicWriteJSON.mockResolvedValue(undefined);
 
     const mod = await import('../vector-store');
     addVector = mod.addVector;
@@ -48,9 +62,9 @@ describe('Vector Store', () => {
     const id = await addVector('hello world', [0.1, 0.2, 0.3], { type: 'test' });
 
     expect(id).toBe('test-uuid-1');
-    // vector file write + index write
-    expect(mockFs.writeFile).toHaveBeenCalledTimes(2);
-    const vectorWriteCall = mockFs.writeFile.mock.calls[0];
+    // vector file atomicWrite + index atomicWrite
+    expect(mockAtomicWriteJSON).toHaveBeenCalledTimes(2);
+    const vectorWriteCall = mockAtomicWriteJSON.mock.calls[0];
     expect(vectorWriteCall[0]).toContain('test-uuid-1.json');
   });
 
@@ -105,12 +119,13 @@ describe('Vector Store', () => {
     await deleteVector('v1');
 
     expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('v1.json'));
-    const indexWrite = mockFs.writeFile.mock.calls.find(
-      (call: string[]) => call[0].includes('index.json')
+    const indexWrite = mockAtomicWriteJSON.mock.calls.find(
+      (call: unknown[]) => (call[0] as string).includes('index.json')
     );
-    const written = JSON.parse(indexWrite![1] as string);
+    expect(indexWrite).toBeDefined();
+    const written = indexWrite![1] as unknown[];
     expect(written).toHaveLength(1);
-    expect(written[0].id).toBe('v2');
+    expect((written[0] as { id: string }).id).toBe('v2');
   });
 
   it('purgeExpiredMemories: 오래된 항목을 제거한다', async () => {

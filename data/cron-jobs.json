@@ -1,0 +1,52 @@
+[
+  {
+    "id": "default-memory-cleanup",
+    "name": "메모리 정리",
+    "cronExpression": "0 3 * * *",
+    "jobType": "memory_cleanup",
+    "jobConfig": {
+      "maxAgeDays": 30,
+      "maxCount": 1000
+    },
+    "enabled": false,
+    "createdAt": 1772730862654,
+    "runCount": 0,
+    "nextRunAt": 1772733600000
+  },
+  {
+    "id": "default-health-check",
+    "name": "건강 체크",
+    "cronExpression": "*/30 * * * *",
+    "jobType": "health_check",
+    "jobConfig": {},
+    "enabled": true,
+    "createdAt": 1772730862654,
+    "runCount": 19,
+    "nextRunAt": 1772803800000,
+    "lastRunAt": 1772802026514
+  },
+  {
+    "id": "default-stats-snapshot",
+    "name": "통계 스냅샷",
+    "cronExpression": "0 0 * * *",
+    "jobType": "agent_run",
+    "jobConfig": {
+      "prompt": "현재 시스템 상태를 요약해주세요."
+    },
+    "enabled": false,
+    "createdAt": 1772730862654,
+    "runCount": 0,
+    "nextRunAt": 1772809200000
+  },
+  {
+    "id": "cron-1772730893701-sfiah5",
+    "name": "테스트 잡",
+    "cronExpression": "*/5 * * * *",
+    "jobType": "health_check",
+    "jobConfig": {},
+    "enabled": false,
+    "createdAt": 1772730893701,
+    "nextRunAt": 1772730900000,
+    "runCount": 0
+  }
+]

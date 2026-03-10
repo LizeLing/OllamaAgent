@@ -1,6 +1,9 @@
 import { AgentSkill } from '@/types/skills';
 import { DEFAULT_SKILLS } from './defaults';
 import { DATA_DIR } from '@/lib/config/constants';
+import { atomicWriteJSON } from '@/lib/storage/atomic-write';
+import { withFileLock } from '@/lib/storage/file-lock';
+import { logger } from '@/lib/logger';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -18,22 +21,60 @@ async function ensureDir() {
   await fs.mkdir(SKILLS_DIR, { recursive: true });
 }
 
+function parseFrontmatter(content: string): { meta: Record<string, string>; body: string } {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!match) return { meta: {}, body: content };
+  const meta: Record<string, string> = {};
+  for (const line of match[1].split('\n')) {
+    const idx = line.indexOf(':');
+    if (idx > 0) {
+      meta[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    }
+  }
+  return { meta, body: match[2] };
+}
+
+async function loadFolderSkill(dirPath: string, dirName: string): Promise<AgentSkill | null> {
+  try {
+    const skillMd = await fs.readFile(path.join(dirPath, 'SKILL.md'), 'utf-8');
+    const { meta, body } = parseFrontmatter(skillMd);
+    return {
+      id: dirName,
+      name: meta.name || dirName,
+      description: meta.description || '',
+      icon: meta.icon,
+      triggerCommand: meta.triggerCommand || meta.trigger,
+      enabledTools: meta.enabledTools ? meta.enabledTools.split(',').map((t) => t.trim()) : [],
+      workflow: [{ id: 'main', instruction: body.trim() }],
+      isBuiltin: false,
+    };
+  } catch (err) {
+    logger.debug('SKILLS', `Failed to load folder skill: ${dirName}`, err);
+    return null;
+  }
+}
+
 async function loadCustomSkills(): Promise<AgentSkill[]> {
   try {
     await ensureDir();
-    const files = await fs.readdir(SKILLS_DIR);
+    const entries = await fs.readdir(SKILLS_DIR, { withFileTypes: true });
     const skills: AgentSkill[] = [];
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
+    for (const entry of entries) {
       try {
-        const data = await fs.readFile(path.join(SKILLS_DIR, file), 'utf-8');
-        skills.push(JSON.parse(data));
-      } catch {
-        // Skip invalid skill file
+        if (entry.isFile() && entry.name.endsWith('.json')) {
+          const data = await fs.readFile(path.join(SKILLS_DIR, entry.name), 'utf-8');
+          skills.push(JSON.parse(data));
+        } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
+          const skill = await loadFolderSkill(path.join(SKILLS_DIR, entry.name), entry.name);
+          if (skill) skills.push(skill);
+        }
+      } catch (err) {
+        logger.warn('SKILLS', `Failed to load skill entry: ${entry.name}`, err);
       }
     }
     return skills;
-  } catch {
+  } catch (err) {
+    logger.warn('SKILLS', 'Failed to load custom skills directory', err);
     return [];
   }
 }
@@ -51,7 +92,8 @@ export async function getSkill(id: string): Promise<AgentSkill | null> {
     validateId(id);
     const data = await fs.readFile(path.join(SKILLS_DIR, `${id}.json`), 'utf-8');
     return JSON.parse(data);
-  } catch {
+  } catch (err) {
+    logger.debug('SKILLS', `Skill not found: ${id}`, err);
     return null;
   }
 }
@@ -59,7 +101,7 @@ export async function getSkill(id: string): Promise<AgentSkill | null> {
 export async function saveSkill(skill: AgentSkill): Promise<void> {
   await ensureDir();
   validateId(skill.id);
-  await fs.writeFile(path.join(SKILLS_DIR, `${skill.id}.json`), JSON.stringify(skill, null, 2));
+  await atomicWriteJSON(path.join(SKILLS_DIR, `${skill.id}.json`), skill);
 }
 
 export async function deleteSkill(id: string): Promise<boolean> {
@@ -70,7 +112,8 @@ export async function deleteSkill(id: string): Promise<boolean> {
     validateId(id);
     await fs.unlink(path.join(SKILLS_DIR, `${id}.json`));
     return true;
-  } catch {
+  } catch (err) {
+    logger.warn('SKILLS', `Failed to delete skill: ${id}`, err);
     return false;
   }
 }

@@ -1,23 +1,16 @@
 import { FolderMeta } from '@/types/folder';
 import { DATA_DIR } from '@/lib/config/constants';
-import fs from 'fs/promises';
+import { atomicWriteJSON, safeReadJSON } from '@/lib/storage/atomic-write';
 import path from 'path';
 
 const FOLDERS_FILE = path.join(DATA_DIR, 'folders.json');
 
 async function readFolders(): Promise<FolderMeta[]> {
-  try {
-    const data = await fs.readFile(FOLDERS_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    // Folders file does not exist yet
-    return [];
-  }
+  return safeReadJSON<FolderMeta[]>(FOLDERS_FILE, []);
 }
 
 async function writeFolders(folders: FolderMeta[]): Promise<void> {
-  await fs.mkdir(path.dirname(FOLDERS_FILE), { recursive: true });
-  await fs.writeFile(FOLDERS_FILE, JSON.stringify(folders, null, 2));
+  await atomicWriteJSON(FOLDERS_FILE, folders);
 }
 
 export async function listFolders(): Promise<FolderMeta[]> {

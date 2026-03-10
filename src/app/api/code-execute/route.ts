@@ -93,10 +93,18 @@ export async function POST(request: NextRequest) {
       const result = await Promise.race([waitPromise, timeoutPromise]);
       statusCode = result.StatusCode;
     } catch (err) {
+      // 타임아웃 전 로그를 먼저 수집
+      let partialOutput = '';
+      try {
+        const logs = await container.logs({ stdout: true, stderr: true });
+        partialOutput = logs.toString('utf-8').replace(/[\x00-\x08]/g, '').trim();
+      } catch { /* 로그 수집 실패 시 무시 */ }
       try { await container.kill(); } catch { /* already stopped */ }
       return Response.json({
         success: false,
+        output: partialOutput || undefined,
         error: err instanceof Error ? err.message : 'Execution timed out',
+        timedOut: true,
       });
     }
 

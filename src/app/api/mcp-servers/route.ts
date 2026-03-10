@@ -3,29 +3,37 @@ import { loadSettings, saveSettings } from '@/lib/config/settings';
 import { McpServerConfig } from '@/types/settings';
 import { testConnection } from '@/lib/mcp/client';
 import { v4 as uuidv4 } from 'uuid';
+import { withErrorHandler } from '@/lib/api/handler';
+import { createMcpServerSchema, deleteByIdSchema, isInternalUrl } from '@/lib/api/schemas';
+import { AppError } from '@/lib/errors';
 
-export async function GET() {
+export const GET = withErrorHandler('MCP_SERVERS', async () => {
   const settings = await loadSettings();
   return NextResponse.json({ servers: settings.mcpServers || [] });
-}
+});
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler('MCP_SERVERS', async (request: NextRequest) => {
   const body = await request.json();
+  const parsed = createMcpServerSchema.parse(body);
 
-  // Test connection endpoint
-  if (body.action === 'test') {
-    const ok = await testConnection(body.url);
+  // SSRF 방지: 내부 네트워크 URL 차단 (stdio 전송은 제외)
+  if (parsed.url && parsed.transport !== 'stdio' && isInternalUrl(parsed.url)) {
+    throw new AppError('내부 네트워크 URL은 허용되지 않습니다.', 400, 'SSRF_BLOCKED');
+  }
+
+  if (parsed.action === 'test') {
+    const ok = await testConnection(parsed.url || '');
     return NextResponse.json({ connected: ok });
   }
 
   const settings = await loadSettings();
   const newServer: McpServerConfig = {
     id: uuidv4(),
-    name: body.name,
-    url: body.url,
-    transport: body.transport || 'sse',
-    command: body.command,
-    args: body.args,
+    name: parsed.name || '',
+    url: parsed.url || '',
+    transport: parsed.transport,
+    command: parsed.command,
+    args: parsed.args,
     enabled: true,
   };
 
@@ -33,9 +41,9 @@ export async function POST(request: NextRequest) {
   await saveSettings({ mcpServers });
 
   return NextResponse.json({ server: newServer });
-}
+});
 
-export async function PUT(request: NextRequest) {
+export const PUT = withErrorHandler('MCP_SERVERS', async (request: NextRequest) => {
   const body = await request.json();
   const settings = await loadSettings();
   const mcpServers = (settings.mcpServers || []).map((s) =>
@@ -43,12 +51,13 @@ export async function PUT(request: NextRequest) {
   );
   await saveSettings({ mcpServers });
   return NextResponse.json({ success: true });
-}
+});
 
-export async function DELETE(request: NextRequest) {
-  const { id } = await request.json();
+export const DELETE = withErrorHandler('MCP_SERVERS', async (request: NextRequest) => {
+  const body = await request.json();
+  const { id } = deleteByIdSchema.parse(body);
   const settings = await loadSettings();
   const mcpServers = (settings.mcpServers || []).filter((s) => s.id !== id);
   await saveSettings({ mcpServers });
   return NextResponse.json({ success: true });
-}
+});

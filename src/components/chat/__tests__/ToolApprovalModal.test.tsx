@@ -21,7 +21,6 @@ describe('ToolApprovalModal', () => {
     const onRespond = vi.fn();
     const { container } = render(<ToolApprovalModal {...defaultProps} onRespond={onRespond} />);
     const buttons = container.querySelectorAll('button');
-    // Approve button is first, deny is second in the flex container
     fireEvent.click(buttons[0]);
     expect(onRespond).toHaveBeenCalledWith('confirm-123', true);
   });
@@ -36,8 +35,45 @@ describe('ToolApprovalModal', () => {
 
   it('renders the modal overlay', () => {
     const { container } = render(<ToolApprovalModal {...defaultProps} />);
-    // The modal has a fixed overlay with bg-black/50
     const overlay = container.firstElementChild;
     expect(overlay).toHaveClass('fixed');
+  });
+
+  // 접근성 테스트
+  it('모달 열릴 때 승인 버튼에 포커스가 이동한다', () => {
+    render(<ToolApprovalModal {...defaultProps} />);
+    const approveBtn = screen.getByLabelText('도구 code_execute 실행 승인');
+    expect(document.activeElement).toBe(approveBtn);
+  });
+
+  it('ESC 키로 거부 응답을 보낸다', () => {
+    const onRespond = vi.fn();
+    const { container } = render(<ToolApprovalModal {...defaultProps} onRespond={onRespond} />);
+    const dialog = container.firstElementChild!;
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(onRespond).toHaveBeenCalledWith('confirm-123', false);
+  });
+
+  it('aria-label이 도구 이름을 포함한다', () => {
+    render(<ToolApprovalModal {...defaultProps} />);
+    expect(screen.getByLabelText('도구 code_execute 실행 승인')).toBeInTheDocument();
+    expect(screen.getByLabelText('도구 code_execute 실행 거부')).toBeInTheDocument();
+  });
+
+  it('Tab 키로 포커스가 모달 내부에서 순환한다', () => {
+    const { container } = render(<ToolApprovalModal {...defaultProps} />);
+    const dialog = container.firstElementChild!;
+    const buttons = container.querySelectorAll('button');
+    const approveBtn = buttons[0];
+    const denyBtn = buttons[1];
+
+    // 승인 버튼에 포커스
+    (approveBtn as HTMLElement).focus();
+    expect(document.activeElement).toBe(approveBtn);
+
+    // 거부 버튼에서 Tab → 승인 버튼으로 순환
+    (denyBtn as HTMLElement).focus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(document.activeElement).toBe(approveBtn);
   });
 });

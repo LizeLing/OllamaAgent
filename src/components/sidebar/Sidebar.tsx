@@ -38,8 +38,8 @@ interface SidebarProps {
   onDeleteFolder: (id: string) => void;
   onRenameFolder: (id: string, name: string) => void;
   onUpdateTags: (id: string, tags: string[]) => void;
-  settingsOpen?: boolean;
-  onSettingsOpen: () => void;
+  activeView?: string;
+  onViewChange: (view: string) => void;
 }
 
 export default function Sidebar({
@@ -62,8 +62,8 @@ export default function Sidebar({
   onDeleteFolder,
   onRenameFolder,
   onUpdateTags,
-  settingsOpen,
-  onSettingsOpen,
+  activeView,
+  onViewChange,
 }: SidebarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -162,11 +162,14 @@ export default function Sidebar({
         <div
           className="fixed inset-0 bg-black/50 z-30 md:hidden"
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
+        role="navigation"
+        aria-label="대화 목록"
         className={`${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         } fixed md:relative z-30 md:z-auto md:translate-x-0 w-72 h-screen flex flex-col bg-background border-r border-border transition-transform duration-200`}
@@ -175,6 +178,7 @@ export default function Sidebar({
         <div className="p-3 border-b border-border flex gap-2">
           <button
             onClick={onNew}
+            aria-label="새 대화 시작"
             className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -187,6 +191,7 @@ export default function Sidebar({
             onClick={() => setShowNewFolder(true)}
             className="p-2 text-muted hover:text-foreground hover:bg-card rounded-lg transition-colors"
             title="새 폴더"
+            aria-label="새 폴더 만들기"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
           </button>
@@ -228,10 +233,11 @@ export default function Sidebar({
         {/* Search */}
         <div className="px-3 py-2">
           <input
-            type="text"
+            type="search"
             value={searchQuery}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="대화 검색..."
+            aria-label="대화 검색"
             className="w-full text-sm bg-card text-foreground placeholder:text-muted rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-accent border border-border"
           />
         </div>
@@ -264,7 +270,7 @@ export default function Sidebar({
         )}
 
         {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto px-2 py-1">
+        <div className="flex-1 overflow-y-auto px-2 py-1" role="list" aria-label="대화 목록">
           {filtered.length === 0 ? (
             <div className="text-center text-muted text-xs py-8">
               {searchQuery ? '검색 결과가 없습니다' : '대화가 없습니다'}
@@ -314,6 +320,7 @@ export default function Sidebar({
           <div className="flex gap-2">
             <button
               onClick={handleImportClick}
+              aria-label="대화 가져오기"
               className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -326,6 +333,7 @@ export default function Sidebar({
             {activeId && (
               <button
                 onClick={() => handleExport(activeId)}
+                aria-label="대화 내보내기"
                 className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-muted bg-card rounded-lg hover:text-foreground hover:bg-card-hover transition-colors"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -338,9 +346,38 @@ export default function Sidebar({
             )}
           </div>
           <button
-            onClick={onSettingsOpen}
+            onClick={() => onViewChange('skills')}
             className={`w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
-              settingsOpen
+              activeView === 'skills'
+                ? 'bg-accent/20 text-accent'
+                : 'text-muted bg-card hover:text-foreground hover:bg-card-hover'
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+              <path d="M9 14l2 2 4-4" />
+            </svg>
+            스킬
+          </button>
+          <button
+            onClick={() => onViewChange('cron')}
+            className={`w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+              activeView === 'cron'
+                ? 'bg-accent/20 text-accent'
+                : 'text-muted bg-card hover:text-foreground hover:bg-card-hover'
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12,6 12,12 16,14" />
+            </svg>
+            예약 작업
+          </button>
+          <button
+            onClick={() => onViewChange('settings')}
+            className={`w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+              activeView === 'settings'
                 ? 'bg-accent/20 text-accent'
                 : 'text-muted bg-card hover:text-foreground hover:bg-card-hover'
             }`}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadHooks, updateHook, removeHook } from '@/lib/hooks/storage';
+import { logger, getErrorMessage } from '@/lib/logger';
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -11,7 +12,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
     return NextResponse.json(hook);
   } catch (error) {
-    console.error('[HOOK_GET_ERROR]', error instanceof Error ? error.message : error);
+    logger.error('HOOKS', 'Failed to get hook', getErrorMessage(error));
     return NextResponse.json({ error: 'Failed to get hook' }, { status: 500 });
   }
 }
@@ -26,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     return NextResponse.json(updated);
   } catch (error) {
-    console.error('[HOOK_UPDATE_ERROR]', error instanceof Error ? error.message : error);
+    logger.error('HOOKS', 'Failed to update hook', getErrorMessage(error));
     return NextResponse.json({ error: 'Failed to update hook' }, { status: 500 });
   }
 }
@@ -40,7 +41,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     }
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('[HOOK_DELETE_ERROR]', error instanceof Error ? error.message : error);
+    logger.error('HOOKS', 'Failed to delete hook', getErrorMessage(error));
     return NextResponse.json({ error: 'Failed to delete hook' }, { status: 500 });
   }
 }

@@ -12,6 +12,12 @@ vi.mock('fs/promises', () => ({
   default: mockFs,
 }));
 
+const mockAtomicWriteJSON = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/storage/atomic-write', () => ({
+  atomicWriteJSON: (...args: unknown[]) => mockAtomicWriteJSON(...args),
+  safeReadJSON: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock('@/lib/config/constants', () => ({
   DATA_DIR: '/tmp/test-data',
 }));
@@ -84,9 +90,9 @@ describe('Preset Storage', () => {
       enabledTools: ['filesystem_read'],
     });
 
-    expect(mockFs.writeFile).toHaveBeenCalledWith(
+    expect(mockAtomicWriteJSON).toHaveBeenCalledWith(
       expect.stringContaining('new-preset.json'),
-      expect.any(String)
+      expect.objectContaining({ id: 'new-preset', name: 'New' })
     );
   });
 

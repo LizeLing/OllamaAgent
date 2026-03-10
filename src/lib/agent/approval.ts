@@ -1,3 +1,5 @@
+import { TIMEOUTS } from '@/lib/config/timeouts';
+
 const pendingApprovals = new Map<string, (approved: boolean) => void>();
 
 export function waitForApproval(confirmId: string): Promise<boolean> {
@@ -8,7 +10,7 @@ export function waitForApproval(confirmId: string): Promise<boolean> {
         pendingApprovals.delete(confirmId);
         resolve(false);
       }
-    }, 60000);
+    }, TIMEOUTS.TOOL_APPROVAL);
   });
 }
 

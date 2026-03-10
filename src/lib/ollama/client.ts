@@ -35,7 +35,9 @@ async function fetchWithRetry(
           error
         );
       }
-      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+      // 지수 백오프 + jitter (최대 30초)
+      const delayMs = Math.min(1000 * Math.pow(2, i), 30000);
+      await new Promise((r) => setTimeout(r, delayMs + Math.random() * 1000));
     }
   }
   throw new OllamaError('Unexpected error in fetchWithRetry');
@@ -76,12 +78,16 @@ export async function* chatStream(
 
   const decoder = new TextDecoder();
   let buffer = '';
+  const MAX_BUFFER_SIZE = 64 * 1024; // 64KB 버퍼 제한
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      throw new OllamaError('스트리밍 버퍼 크기 초과 (64KB). 응답이 손상되었을 수 있습니다.');
+    }
     const lines = buffer.split('\n');
     buffer = lines.pop() || '';
 
@@ -89,8 +95,11 @@ export async function* chatStream(
       if (line.trim()) {
         try {
           yield JSON.parse(line);
-        } catch {
-          // skip malformed JSON
+        } catch (err) {
+          // 손상된 JSON 청크 무시 (스트리밍 경계에서 발생 가능)
+          if (process.env.LOG_LEVEL === 'debug') {
+            console.debug('[OLLAMA] Malformed JSON chunk:', line.slice(0, 100), err);
+          }
         }
       }
     }
@@ -99,8 +108,10 @@ export async function* chatStream(
   if (buffer.trim()) {
     try {
       yield JSON.parse(buffer);
-    } catch {
-      // skip
+    } catch (err) {
+      if (process.env.LOG_LEVEL === 'debug') {
+        console.debug('[OLLAMA] Malformed final buffer:', buffer.slice(0, 100), err);
+      }
     }
   }
 }

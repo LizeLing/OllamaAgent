@@ -3,6 +3,9 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { cosineSimilarity } from './embedder';
 import { DATA_DIR } from '@/lib/config/constants';
+import { atomicWriteJSON } from '@/lib/storage/atomic-write';
+import { withFileLock } from '@/lib/storage/file-lock';
+import { logger } from '@/lib/logger';
 
 interface VectorEntry {
   id: string;
@@ -38,7 +41,7 @@ async function loadIndex(): Promise<IndexEntry[]> {
 
 async function saveIndex(index: IndexEntry[]) {
   await ensureDirs();
-  await fs.writeFile(INDEX_FILE, JSON.stringify(index, null, 2));
+  await atomicWriteJSON(INDEX_FILE, index);
 }
 
 export async function addVector(
@@ -46,28 +49,32 @@ export async function addVector(
   vector: number[],
   metadata?: Record<string, unknown>
 ): Promise<string> {
-  await ensureDirs();
+  return withFileLock(INDEX_FILE, async () => {
+    await ensureDirs();
 
-  const id = uuidv4();
-  const entry: VectorEntry = {
-    id,
-    text,
-    vector,
-    metadata,
-    createdAt: Date.now(),
-  };
+    const id = uuidv4();
+    const entry: VectorEntry = {
+      id,
+      text,
+      vector,
+      metadata,
+      createdAt: Date.now(),
+    };
 
-  await fs.writeFile(
-    path.join(VECTORS_DIR, `${id}.json`),
-    JSON.stringify(entry)
-  );
+    await atomicWriteJSON(
+      path.join(VECTORS_DIR, `${id}.json`),
+      entry
+    );
 
-  const index = await loadIndex();
-  index.push({ id, text, metadata, createdAt: entry.createdAt });
-  await saveIndex(index);
+    const index = await loadIndex();
+    index.push({ id, text, metadata, createdAt: entry.createdAt });
+    await saveIndex(index);
 
-  return id;
+    return id;
+  });
 }
+
+const SEARCH_BATCH_SIZE = 25;
 
 export async function searchVectors(
   queryVector: number[],
@@ -79,16 +86,21 @@ export async function searchVectors(
   const index = await loadIndex();
   const results: { text: string; similarity: number; metadata?: Record<string, unknown> }[] = [];
 
-  for (const entry of index) {
-    try {
-      const data = await fs.readFile(path.join(VECTORS_DIR, `${entry.id}.json`), 'utf-8');
-      const vectorEntry: VectorEntry = JSON.parse(data);
-      const similarity = cosineSimilarity(queryVector, vectorEntry.vector);
-      if (similarity >= threshold) {
-        results.push({ text: entry.text, similarity, metadata: entry.metadata });
+  // 배치 병렬 읽기로 I/O 최적화
+  for (let i = 0; i < index.length; i += SEARCH_BATCH_SIZE) {
+    const batch = index.slice(i, i + SEARCH_BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (entry) => {
+        const data = await fs.readFile(path.join(VECTORS_DIR, `${entry.id}.json`), 'utf-8');
+        const vectorEntry: VectorEntry = JSON.parse(data);
+        const similarity = cosineSimilarity(queryVector, vectorEntry.vector);
+        return { text: entry.text, similarity, metadata: entry.metadata };
+      })
+    );
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled' && r.value.similarity >= threshold) {
+        results.push(r.value);
       }
-    } catch {
-      // Skip corrupted entries
     }
   }
 
@@ -102,37 +114,42 @@ export async function getMemoryCount(): Promise<number> {
 }
 
 export async function deleteVector(id: string): Promise<void> {
-  try {
-    await fs.unlink(path.join(VECTORS_DIR, `${id}.json`));
-  } catch {
-    // file may not exist
-  }
-  const index = await loadIndex();
-  const filtered = index.filter((e) => e.id !== id);
-  await saveIndex(filtered);
+  return withFileLock(INDEX_FILE, async () => {
+    try {
+      await fs.unlink(path.join(VECTORS_DIR, `${id}.json`));
+    } catch (err) {
+      logger.warn('VECTOR_STORE', `Vector file not found: ${id}`, err);
+    }
+    const index = await loadIndex();
+    const filtered = index.filter((e) => e.id !== id);
+    await saveIndex(filtered);
+  });
 }
 
 export async function purgeExpiredMemories(maxAgeDays: number = 30, maxCount: number = 1000): Promise<number> {
-  const index = await loadIndex();
-  const now = Date.now();
-  const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+  return withFileLock(INDEX_FILE, async () => {
+    const index = await loadIndex();
+    const now = Date.now();
+    const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
 
-  const valid = index.filter((e) => (now - e.createdAt) < maxAgeMs);
-  valid.sort((a, b) => b.createdAt - a.createdAt);
-  const toKeep = valid.slice(0, maxCount);
-  const toDelete = index.filter((e) => !toKeep.find((k) => k.id === e.id));
+    const valid = index.filter((e) => (now - e.createdAt) < maxAgeMs);
+    valid.sort((a, b) => b.createdAt - a.createdAt);
+    const toKeep = valid.slice(0, maxCount);
+    const toKeepIds = new Set(toKeep.map((k) => k.id));
+    const toDelete = index.filter((e) => !toKeepIds.has(e.id));
 
-  for (const entry of toDelete) {
-    try {
-      await fs.unlink(path.join(VECTORS_DIR, `${entry.id}.json`));
-    } catch {
-      // skip
+    for (const entry of toDelete) {
+      try {
+        await fs.unlink(path.join(VECTORS_DIR, `${entry.id}.json`));
+      } catch (err) {
+        logger.warn('VECTOR_STORE', `Failed to delete vector file: ${entry.id}`, err);
+      }
     }
-  }
 
-  if (toDelete.length > 0) {
-    await saveIndex(toKeep);
-  }
+    if (toDelete.length > 0) {
+      await saveIndex(toKeep);
+    }
 
-  return toDelete.length;
+    return toDelete.length;
+  });
 }

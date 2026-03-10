@@ -1,5 +1,6 @@
 import { BaseTool } from './base-tool';
 import { ToolDefinition, ToolResult } from '@/lib/agent/types';
+import { TIMEOUTS, LIMITS } from '@/lib/config/timeouts';
 import Docker from 'dockerode';
 
 const docker = new Docker();
@@ -53,8 +54,8 @@ export class CodeExecutorTool extends BaseTool {
         Image: config.image,
         Cmd: config.cmd(code),
         HostConfig: {
-          Memory: 256 * 1024 * 1024, // 256MB
-          MemorySwap: 256 * 1024 * 1024,
+          Memory: LIMITS.DOCKER_MEMORY,
+          MemorySwap: LIMITS.DOCKER_MEMORY,
           CpuPeriod: 100000,
           CpuQuota: 50000, // 50% CPU
           NetworkMode: 'none',
@@ -68,7 +69,7 @@ export class CodeExecutorTool extends BaseTool {
       // Wait with timeout
       const waitPromise = container.wait();
       const timeoutPromise = new Promise<{ StatusCode: number }>((_, reject) =>
-        setTimeout(() => reject(new Error('Execution timed out (30s)')), 30000)
+        setTimeout(() => reject(new Error(`Execution timed out (${TIMEOUTS.CODE_EXECUTION / 1000}s)`)), TIMEOUTS.CODE_EXECUTION)
       );
 
       let statusCode: number;

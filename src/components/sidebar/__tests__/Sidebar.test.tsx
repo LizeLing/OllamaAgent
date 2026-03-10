@@ -47,7 +47,7 @@ describe('Sidebar', () => {
   it('search input filters and calls onSearch', () => {
     const onSearch = vi.fn();
     const { container } = render(<Sidebar {...baseProps} onSearch={onSearch} />);
-    const input = container.querySelector('input[type="text"]');
+    const input = container.querySelector('input[type="search"]');
     fireEvent.change(input!, { target: { value: 'hello' } });
     expect(onSearch).toHaveBeenCalledWith('hello');
   });

@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFs = {
-  readFile: vi.fn(),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-  mkdir: vi.fn().mockResolvedValue(undefined),
-};
+const mockAtomicWrite = vi.fn().mockResolvedValue(undefined);
+const mockSafeRead = vi.fn();
 
-vi.mock('fs/promises', () => ({
-  default: mockFs,
+vi.mock('@/lib/storage/atomic-write', () => ({
+  atomicWriteJSON: (...args: unknown[]) => mockAtomicWrite(...args),
+  safeReadJSON: (...args: unknown[]) => mockSafeRead(...args),
 }));
 
 vi.mock('@/lib/config/constants', () => ({
@@ -41,9 +39,8 @@ describe('Settings', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    mockFs.readFile.mockRejectedValue(new Error('not found'));
-    mockFs.writeFile.mockResolvedValue(undefined);
-    mockFs.mkdir.mockResolvedValue(undefined);
+    mockSafeRead.mockResolvedValue({});
+    mockAtomicWrite.mockResolvedValue(undefined);
 
     const mod = await import('../settings');
     loadSettings = mod.loadSettings;
@@ -51,7 +48,7 @@ describe('Settings', () => {
   });
 
   it('loadSettings: 파일이 없으면 DEFAULT_SETTINGS를 반환한다', async () => {
-    mockFs.readFile.mockRejectedValueOnce(new Error('ENOENT'));
+    mockSafeRead.mockResolvedValueOnce({});
 
     const settings = await loadSettings();
 
@@ -62,45 +59,36 @@ describe('Settings', () => {
 
   it('loadSettings: 저장된 설정을 기본값과 병합한다', async () => {
     const saved = { ollamaModel: 'llama3:8b', maxIterations: 20 };
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify(saved));
+    mockSafeRead.mockResolvedValueOnce(saved);
 
     const settings = await loadSettings();
 
     expect(settings.ollamaModel).toBe('llama3:8b');
     expect(settings.maxIterations).toBe(20);
-    expect(settings.ollamaUrl).toBe('http://localhost:11434'); // from default
+    expect(settings.ollamaUrl).toBe('http://localhost:11434');
   });
 
   it('saveSettings: 현재 설정을 읽고 병합하여 저장한다', async () => {
-    // loadSettings reads file
-    mockFs.readFile.mockRejectedValueOnce(new Error('not found'));
+    mockSafeRead.mockResolvedValueOnce({});
 
     const result = await saveSettings({ ollamaModel: 'gemma3:12b' });
 
     expect(result.ollamaModel).toBe('gemma3:12b');
     expect(result.ollamaUrl).toBe('http://localhost:11434');
-    expect(mockFs.writeFile).toHaveBeenCalledWith(
+    expect(mockAtomicWrite).toHaveBeenCalledWith(
       expect.stringContaining('settings.json'),
-      expect.any(String)
+      expect.objectContaining({ ollamaModel: 'gemma3:12b' })
     );
-    expect(mockFs.mkdir).toHaveBeenCalled();
   });
 
   it('saveSettings: 기존 설정에 부분 업데이트를 적용한다', async () => {
     const existing = { ollamaModel: 'llama3:8b', maxIterations: 5 };
-    mockFs.readFile.mockResolvedValueOnce(JSON.stringify(existing));
+    mockSafeRead.mockResolvedValueOnce(existing);
 
     const result = await saveSettings({ maxIterations: 15 });
 
     expect(result.ollamaModel).toBe('llama3:8b');
     expect(result.maxIterations).toBe(15);
-  });
-
-  it('loadSettings: 손상된 JSON에서 기본값을 반환한다', async () => {
-    mockFs.readFile.mockResolvedValueOnce('invalid{json');
-
-    const settings = await loadSettings();
-    expect(settings.maxIterations).toBe(10);
   });
 
   it('DEFAULT_SETTINGS에 환경 변수 오버라이드가 적용된다', async () => {

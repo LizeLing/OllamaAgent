@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock fs module
+// Mock fs module (still needed for getConversation, deleteConversation which use fs directly)
 const mockFs = {
   mkdir: vi.fn().mockResolvedValue(undefined),
   readFile: vi.fn(),
   writeFile: vi.fn().mockResolvedValue(undefined),
   unlink: vi.fn().mockResolvedValue(undefined),
+  rename: vi.fn().mockResolvedValue(undefined),
 };
 
 vi.mock('fs/promises', () => ({
@@ -14,6 +15,15 @@ vi.mock('fs/promises', () => ({
 
 vi.mock('@/lib/config/constants', () => ({
   DATA_DIR: '/tmp/test-data',
+}));
+
+// Mock atomic-write module (used by readIndex, writeIndex, saveConversation, clearFolderFromConversations)
+const mockAtomicWriteJSON = vi.fn().mockResolvedValue(undefined);
+const mockSafeReadJSON = vi.fn();
+
+vi.mock('@/lib/storage/atomic-write', () => ({
+  atomicWriteJSON: mockAtomicWriteJSON,
+  safeReadJSON: mockSafeReadJSON,
 }));
 
 describe('Conversation Storage', () => {
@@ -28,10 +38,14 @@ describe('Conversation Storage', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
+    // fs mocks (still used by getConversation, deleteConversation)
     mockFs.readFile.mockRejectedValue(new Error('not found'));
     mockFs.writeFile.mockResolvedValue(undefined);
     mockFs.mkdir.mockResolvedValue(undefined);
     mockFs.unlink.mockResolvedValue(undefined);
+    // atomic-write mocks (used by readIndex, writeIndex, saveConversation, clearFolderFromConversations)
+    mockSafeReadJSON.mockResolvedValue([]);
+    mockAtomicWriteJSON.mockResolvedValue(undefined);
 
     const mod = await import('../storage');
     listConversations = mod.listConversations;
@@ -71,7 +85,7 @@ describe('Conversation Storage', () => {
         { id: 'c2', title: 'New', createdAt: 200, updatedAt: 200, messageCount: 1 },
         { id: 'c3', title: 'Pinned', createdAt: 50, updatedAt: 50, messageCount: 1, pinned: true },
       ];
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+      mockSafeReadJSON.mockResolvedValueOnce(index);
 
       const result = await listConversations();
 
@@ -83,8 +97,7 @@ describe('Conversation Storage', () => {
 
   describe('saveConversation', () => {
     it('파일을 생성하고 인덱스를 업데이트한다', async () => {
-      // readIndex returns empty
-      mockFs.readFile.mockRejectedValueOnce(new Error('not found'));
+      // readIndex returns empty (default from beforeEach)
 
       await saveConversation({
         id: 'conv-1',
@@ -98,21 +111,21 @@ describe('Conversation Storage', () => {
         ],
       });
 
-      // Should write conversation file
-      expect(mockFs.writeFile).toHaveBeenCalledWith(
+      // Should write conversation file via atomicWriteJSON
+      expect(mockAtomicWriteJSON).toHaveBeenCalledWith(
         expect.stringContaining('conv-1.json'),
-        expect.any(String)
+        expect.any(Object)
       );
-      // Should write index
-      expect(mockFs.writeFile).toHaveBeenCalledTimes(2);
+      // Should write index via atomicWriteJSON (conv file + index = 2 calls)
+      expect(mockAtomicWriteJSON).toHaveBeenCalledTimes(2);
     });
 
     it('기존 항목을 업데이트한다', async () => {
       const existingIndex = [
         { id: 'conv-1', title: 'Old Title', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
       ];
-      // First readFile for readIndex
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(existingIndex));
+      // safeReadJSON for readIndex
+      mockSafeReadJSON.mockResolvedValueOnce(existingIndex);
 
       await saveConversation({
         id: 'conv-1',
@@ -127,11 +140,12 @@ describe('Conversation Storage', () => {
         ],
       });
 
-      // The index write should contain updated title
-      const indexWriteCall = mockFs.writeFile.mock.calls.find(
-        (call: string[]) => call[0].includes('index.json')
+      // The index write via atomicWriteJSON should contain updated title
+      const indexWriteCall = mockAtomicWriteJSON.mock.calls.find(
+        (call: unknown[]) => (call[0] as string).includes('index.json')
       );
-      const writtenIndex = JSON.parse(indexWriteCall![1] as string);
+      expect(indexWriteCall).toBeDefined();
+      const writtenIndex = indexWriteCall![1] as Array<{ title: string }>;
       expect(writtenIndex[0].title).toBe('New Title');
       expect(writtenIndex).toHaveLength(1);
     });
@@ -143,15 +157,19 @@ describe('Conversation Storage', () => {
         { id: 'conv-1', title: 'Test', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
         { id: 'conv-2', title: 'Keep', createdAt: 2000, updatedAt: 2000, messageCount: 1 },
       ];
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+      // readIndex uses safeReadJSON
+      mockSafeReadJSON.mockResolvedValueOnce(index);
 
       await deleteConversation('conv-1');
 
+      // fs.unlink is still used directly for the conversation file
       expect(mockFs.unlink).toHaveBeenCalledWith(expect.stringContaining('conv-1.json'));
-      const indexWriteCall = mockFs.writeFile.mock.calls.find(
-        (call: string[]) => call[0].includes('index.json')
+      // writeIndex uses atomicWriteJSON
+      const indexWriteCall = mockAtomicWriteJSON.mock.calls.find(
+        (call: unknown[]) => (call[0] as string).includes('index.json')
       );
-      const writtenIndex = JSON.parse(indexWriteCall![1] as string);
+      expect(indexWriteCall).toBeDefined();
+      const writtenIndex = indexWriteCall![1] as Array<{ id: string }>;
       expect(writtenIndex).toHaveLength(1);
       expect(writtenIndex[0].id).toBe('conv-2');
     });
@@ -163,8 +181,8 @@ describe('Conversation Storage', () => {
         { id: 'c1', title: 'React Tutorial', createdAt: 1000, updatedAt: 1000, messageCount: 1 },
         { id: 'c2', title: 'Vue Guide', createdAt: 2000, updatedAt: 2000, messageCount: 1 },
       ];
-      // readIndex call
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
+      // readIndex uses safeReadJSON
+      mockSafeReadJSON.mockResolvedValueOnce(index);
 
       const results = await searchConversations('react');
 
@@ -185,9 +203,9 @@ describe('Conversation Storage', () => {
         messageCount: 1,
         messages: [{ id: 'm1', role: 'user', content: 'How to use TypeScript generics?', timestamp: 1000 }],
       };
-      // readIndex for search
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
-      // getConversation for content search
+      // readIndex uses safeReadJSON
+      mockSafeReadJSON.mockResolvedValueOnce(index);
+      // getConversation still uses fs.readFile directly
       mockFs.readFile.mockResolvedValueOnce(JSON.stringify(conversation));
 
       const results = await searchConversations('typescript');
@@ -205,26 +223,27 @@ describe('Conversation Storage', () => {
         { id: 'c2', title: 'B', createdAt: 2000, updatedAt: 2000, messageCount: 1, folderId: 'f2' },
       ];
       const conv1 = { id: 'c1', title: 'A', folderId: 'f1', messages: [] };
-      // readIndex
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(index));
-      // readFile for conversation c1
-      mockFs.readFile.mockResolvedValueOnce(JSON.stringify(conv1));
+      // readIndex uses safeReadJSON
+      mockSafeReadJSON.mockResolvedValueOnce(index);
+      // safeReadJSON for individual conversation c1
+      mockSafeReadJSON.mockResolvedValueOnce(conv1);
 
       await clearFolderFromConversations('f1');
 
-      // Should write updated conversation file
-      const convWriteCall = mockFs.writeFile.mock.calls.find(
-        (call: string[]) => call[0].includes('c1.json')
+      // Should write updated conversation file via atomicWriteJSON
+      const convWriteCall = mockAtomicWriteJSON.mock.calls.find(
+        (call: unknown[]) => (call[0] as string).includes('c1.json')
       );
       expect(convWriteCall).toBeDefined();
-      const written = JSON.parse(convWriteCall![1] as string);
+      const written = convWriteCall![1] as Record<string, unknown>;
       expect(written.folderId).toBeUndefined();
     });
   });
 
   describe('corrupted index', () => {
     it('손상된 인덱스 파일에서 빈 배열을 반환한다', async () => {
-      mockFs.readFile.mockResolvedValueOnce('invalid json{{{');
+      // safeReadJSON returns default value [] on parse failure
+      mockSafeReadJSON.mockResolvedValueOnce([]);
 
       const result = await listConversations();
       expect(result).toEqual([]);

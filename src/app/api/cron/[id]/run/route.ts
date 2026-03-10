@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { loadJobs, updateJob, appendHistory } from '@/lib/cron/storage';
 import { getNextRunTime } from '@/lib/cron/parser';
 import { CronJobExecutor } from '@/lib/cron/job-executor';
+import { withErrorHandler } from '@/lib/api/handler';
 
-export async function POST(
+export const POST = withErrorHandler('CRON_RUN', async (
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params;
   const jobs = await loadJobs();
   const job = jobs.find((j) => j.id === id);
@@ -25,4 +26,4 @@ export async function POST(
   await appendHistory(result);
 
   return NextResponse.json(result);
-}
+});

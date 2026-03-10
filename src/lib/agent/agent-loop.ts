@@ -24,7 +24,8 @@ export async function* runAgentLoop(
   userMessage: string,
   history: { role: string; content: string }[],
   memories: string[] = [],
-  images: string[] = []
+  images: string[] = [],
+  abortSignal?: AbortSignal
 ): AsyncGenerator<AgentEvent> {
   // Build system prompt with memories
   let systemPrompt = config.systemPrompt;
@@ -37,8 +38,10 @@ export async function* runAgentLoop(
     userMsg.images = images;
   }
 
-  // Trim history to fit context window (~16K chars ≈ 32K tokens)
-  const maxHistoryChars = 16000;
+  // Trim history to fit context window
+  // 한국어는 글자당 ~2-3 토큰, 영어는 ~0.25 토큰 소비
+  // 보수적으로 10K chars로 제한 (혼합 텍스트 기준 ~20K 토큰)
+  const maxHistoryChars = 10000;
   const trimmedHistory = trimHistory(history, maxHistoryChars);
 
   const messages: OllamaChatMessage[] = [
@@ -52,6 +55,11 @@ export async function* runAgentLoop(
   let activeModel = config.ollamaModel;
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
+    if (abortSignal?.aborted) {
+      yield { type: 'done', data: { iterations: iteration, model: activeModel, aborted: true } };
+      return;
+    }
+
     yield { type: 'thinking', data: { iteration } };
 
     // Non-streaming call to check for tool use (think: false for speed)
@@ -83,6 +91,10 @@ export async function* runAgentLoop(
         options: config.modelOptions,
         format: config.format,
       })) {
+        if (abortSignal?.aborted) {
+          yield { type: 'done', data: { iterations: iteration + 1, model: activeModel, aborted: true } };
+          return;
+        }
         if (chunk.done) {
           promptTokens = chunk.prompt_eval_count || 0;
           completionTokens = chunk.eval_count || 0;
@@ -115,7 +127,7 @@ export async function* runAgentLoop(
 
     // Yield any text content before tool calls
     if (assistantMsg.content) {
-      const chunks = splitIntoChunks(assistantMsg.content, 4);
+      const chunks = splitIntoChunks(assistantMsg.content);
       for (const chunk of chunks) {
         yield { type: 'token', data: { content: chunk } };
       }
@@ -132,22 +144,20 @@ export async function* runAgentLoop(
     const DANGEROUS_TOOLS = ['code_execute', 'filesystem_write'];
     let loopAborted = false;
 
+    // 승인 필요 여부 사전 체크 + 루프 감지
+    const needsApproval = config.toolApprovalMode && config.toolApprovalMode !== 'auto';
+    const pendingTools: typeof toolCalls = [];
+
     for (const tc of toolCalls) {
+      if (abortSignal?.aborted) { loopAborted = true; break; }
+
       const toolName = tc.function.name;
       const toolArgs = tc.function.arguments;
-
-      // Loop detection check (before approval)
       const checkResult = tracker.check(toolName, toolArgs);
 
       if (checkResult.action === 'abort') {
-        yield {
-          type: 'loop_detected',
-          data: { toolName, count: 3, message: '동일 도구 반복 호출이 감지되어 에이전트를 중단했습니다.' },
-        };
-        messages.push({
-          role: 'tool',
-          content: `[시스템] 도구 반복 호출로 인해 에이전트가 중단되었습니다: '${toolName}'`,
-        });
+        yield { type: 'loop_detected', data: { toolName, count: 3, message: '동일 도구 반복 호출이 감지되어 에이전트를 중단했습니다.' } };
+        messages.push({ role: 'tool', content: `[시스템] 도구 반복 호출로 인해 에이전트가 중단되었습니다: '${toolName}'` });
         iteration = config.maxIterations;
         loopAborted = true;
         break;
@@ -155,22 +165,15 @@ export async function* runAgentLoop(
 
       if (checkResult.action === 'inject') {
         const cachedOutput = checkResult.cachedOutput;
-        const redirectMsg = `[시스템] 도구 반복 호출 감지: '${toolName}'을 동일한 입력으로 이미 호출했습니다.\n이전 결과: ${cachedOutput}\n동일한 도구 호출을 반복하지 말고 다른 접근 방식을 시도하세요.`;
-        messages.push({
-          role: 'tool',
-          content: redirectMsg,
-        });
+        messages.push({ role: 'tool', content: `[시스템] 도구 반복 호출 감지: '${toolName}'을 동일한 입력으로 이미 호출했습니다.\n이전 결과: ${cachedOutput}\n동일한 도구 호출을 반복하지 말고 다른 접근 방식을 시도하세요.` });
         tracker.record(toolName, toolArgs, cachedOutput);
         continue;
       }
 
-      // action === 'execute': proceed with normal execution
-
-      // Check tool approval mode
-      if (config.toolApprovalMode && config.toolApprovalMode !== 'auto') {
+      // 승인 필요 시 순차 처리
+      if (needsApproval) {
         const isDangerous = DANGEROUS_TOOLS.includes(toolName);
-        if (config.toolApprovalMode === 'confirm' ||
-            (config.toolApprovalMode === 'deny-dangerous' && isDangerous)) {
+        if (config.toolApprovalMode === 'confirm' || (config.toolApprovalMode === 'deny-dangerous' && isDangerous)) {
           const confirmId = `${Date.now()}-${toolName}`;
           yield { type: 'tool_confirm', data: { tool: toolName, input: toolArgs, confirmId } };
           if (config.onToolApproval) {
@@ -184,57 +187,56 @@ export async function* runAgentLoop(
         }
       }
 
-      yield { type: 'tool_start', data: { tool: toolName, input: toolArgs } };
+      pendingTools.push(tc);
+    }
 
-      const result = await toolRegistry.execute(toolName, toolArgs);
-
-      // Drain subagent events if tool supports it
-      const executedTool = toolRegistry.get(toolName);
-      if (executedTool && 'drainEvents' in executedTool) {
-        for (const evt of (executedTool as { drainEvents(): AgentEvent[] }).drainEvents()) {
-          yield evt;
-        }
+    if (!loopAborted && pendingTools.length > 0) {
+      // 도구 시작 이벤트 발행
+      for (const tc of pendingTools) {
+        yield { type: 'tool_start', data: { tool: tc.function.name, input: tc.function.arguments } };
       }
 
-      // Check if result contains image data
-      let observation = result.output;
-      if (result.success && result.output.startsWith('__IMAGE__')) {
-        const imageMatch = result.output.match(/__IMAGE__([\s\S]+?)__PROMPT__([\s\S]+)/);
-        if (imageMatch) {
-          yield {
-            type: 'image',
-            data: { base64: imageMatch[1], prompt: imageMatch[2] },
-          };
-          observation = `Image generated successfully for prompt: "${imageMatch[2]}"`;
+      // 독립적인 도구들을 병렬 실행
+      const execResults = await Promise.all(
+        pendingTools.map((tc) => toolRegistry.execute(tc.function.name, tc.function.arguments).catch((err) => ({
+          output: `도구 실행 실패: ${err instanceof Error ? err.message : 'Unknown'}`,
+          success: false,
+        })))
+      );
+
+      for (let i = 0; i < pendingTools.length; i++) {
+        const tc = pendingTools[i];
+        const toolName = tc.function.name;
+        const toolArgs = tc.function.arguments;
+        const result = execResults[i];
+
+        // Drain subagent events if tool supports it
+        const executedTool = toolRegistry.get(toolName);
+        if (executedTool && 'drainEvents' in executedTool) {
+          for (const evt of (executedTool as { drainEvents(): AgentEvent[] }).drainEvents()) {
+            yield evt;
+          }
         }
-      }
 
-      yield {
-        type: 'tool_end',
-        data: {
-          tool: toolName,
-          output: observation.slice(0, 2000),
-          success: result.success,
-        },
-      };
+        let observation = result.output;
+        if (result.success && result.output.startsWith('__IMAGE__')) {
+          const imageMatch = result.output.match(/__IMAGE__([\s\S]+?)__PROMPT__([\s\S]+)/);
+          if (imageMatch) {
+            yield { type: 'image', data: { base64: imageMatch[1], prompt: imageMatch[2] } };
+            observation = `Image generated successfully for prompt: "${imageMatch[2]}"`;
+          }
+        }
 
-      // Add tool response to conversation
-      messages.push({
-        role: 'tool',
-        content: observation,
-      });
+        yield { type: 'tool_end', data: { tool: toolName, output: observation.slice(0, 2000), success: result.success } };
+        messages.push({ role: 'tool', content: observation });
+        tracker.record(toolName, toolArgs, observation);
 
-      // Record tool call result and check for repeating patterns
-      tracker.record(toolName, toolArgs, observation);
-
-      if (tracker.detectRepeatingPattern()) {
-        yield {
-          type: 'loop_detected',
-          data: { toolName, count: 3, message: '동일 도구 반복 호출이 감지되어 에이전트를 중단했습니다.' },
-        };
-        iteration = config.maxIterations;
-        loopAborted = true;
-        break;
+        if (tracker.detectRepeatingPattern()) {
+          yield { type: 'loop_detected', data: { toolName, count: 3, message: '동일 도구 반복 호출이 감지되어 에이전트를 중단했습니다.' } };
+          iteration = config.maxIterations;
+          loopAborted = true;
+          break;
+        }
       }
     }
 
@@ -249,7 +251,7 @@ export async function* runAgentLoop(
   yield { type: 'done', data: { iterations: config.maxIterations, model: activeModel } };
 }
 
-function splitIntoChunks(text: string, chunkSize: number): string[] {
+function splitIntoChunks(text: string, chunkSize: number = 512): string[] {
   const chunks: string[] = [];
   for (let i = 0; i < text.length; i += chunkSize) {
     chunks.push(text.slice(i, i + chunkSize));

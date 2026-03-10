@@ -1,6 +1,9 @@
 import { AgentPreset } from '@/types/settings';
 import { DEFAULT_PRESETS } from './defaults';
 import { DATA_DIR } from '@/lib/config/constants';
+import { atomicWriteJSON } from '@/lib/storage/atomic-write';
+import { withFileLock } from '@/lib/storage/file-lock';
+import { logger } from '@/lib/logger';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -28,13 +31,13 @@ async function loadCustomPresets(): Promise<AgentPreset[]> {
       try {
         const data = await fs.readFile(path.join(PRESETS_DIR, file), 'utf-8');
         presets.push(JSON.parse(data));
-      } catch {
-        // Skip invalid preset file
+      } catch (err) {
+        logger.warn('PRESETS', `Failed to load preset: ${file}`, err);
       }
     }
     return presets;
-  } catch {
-    // Presets directory does not exist yet
+  } catch (err) {
+    logger.debug('PRESETS', 'Presets directory not accessible', err);
     return [];
   }
 }
@@ -52,8 +55,8 @@ export async function getPreset(id: string): Promise<AgentPreset | null> {
     validateId(id);
     const data = await fs.readFile(path.join(PRESETS_DIR, `${id}.json`), 'utf-8');
     return JSON.parse(data);
-  } catch {
-    // Preset file not found
+  } catch (err) {
+    logger.debug('PRESETS', `Preset not found: ${id}`, err);
     return null;
   }
 }
@@ -61,7 +64,7 @@ export async function getPreset(id: string): Promise<AgentPreset | null> {
 export async function savePreset(preset: AgentPreset): Promise<void> {
   await ensureDir();
   validateId(preset.id);
-  await fs.writeFile(path.join(PRESETS_DIR, `${preset.id}.json`), JSON.stringify(preset, null, 2));
+  await atomicWriteJSON(path.join(PRESETS_DIR, `${preset.id}.json`), preset);
 }
 
 export async function deletePreset(id: string): Promise<boolean> {
@@ -72,8 +75,8 @@ export async function deletePreset(id: string): Promise<boolean> {
     validateId(id);
     await fs.unlink(path.join(PRESETS_DIR, `${id}.json`));
     return true;
-  } catch {
-    // Preset file not found
+  } catch (err) {
+    logger.warn('PRESETS', `Failed to delete preset: ${id}`, err);
     return false;
   }
 }
