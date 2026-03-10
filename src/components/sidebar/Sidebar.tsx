@@ -346,6 +346,20 @@ export default function Sidebar({
             )}
           </div>
           <button
+            onClick={() => onViewChange('knowledge')}
+            className={`w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
+              activeView === 'knowledge'
+                ? 'bg-accent/20 text-accent'
+                : 'text-muted bg-card hover:text-foreground hover:bg-card-hover'
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+            </svg>
+            지식 베이스
+          </button>
+          <button
             onClick={() => onViewChange('skills')}
             className={`w-full flex items-center justify-center gap-2 px-2 py-1.5 text-xs rounded-lg transition-colors ${
               activeView === 'skills'

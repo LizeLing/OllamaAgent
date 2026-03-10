@@ -18,6 +18,7 @@ import ShortcutGuide from '@/components/ui/ShortcutGuide';
 import StatsPanel from '@/components/ui/StatsPanel';
 import ToolLogPanel from '@/components/ui/ToolLogPanel';
 import ArtifactPanel from '@/components/artifacts/ArtifactPanel';
+import KnowledgePanel from '@/components/knowledge/KnowledgePanel';
 import { Artifact } from '@/types/artifacts';
 import { useCommands } from './useCommands';
 import { useDragDrop } from './useDragDrop';
@@ -58,7 +59,7 @@ export default function ChatContainer() {
     deleteFolder: deleteFolderFn,
     renameFolder,
   } = useConversations();
-  const [activeView, setActiveView] = useState<'chat' | 'settings' | 'skills' | 'cron'>('chat');
+  const [activeView, setActiveView] = useState<'chat' | 'settings' | 'skills' | 'cron' | 'knowledge'>('chat');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // 화면 크기에 따른 사이드바 상태 + 리사이즈 감지
@@ -105,16 +106,18 @@ export default function ChatContainer() {
   // 대화별 아티팩트 조회
   useEffect(() => {
     if (!conversationId) {
-      setArtifacts([]);
-      setShowArtifacts(false);
+      const clear = () => { setArtifacts([]); setShowArtifacts(false); };
+      clear();
       return;
     }
-    fetch(`/api/artifacts?conversationId=${conversationId}`)
+    const controller = new AbortController();
+    fetch(`/api/artifacts?conversationId=${conversationId}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setArtifacts(data);
       })
-      .catch(() => setArtifacts([]));
+      .catch(() => { if (!controller.signal.aborted) setArtifacts([]); });
+    return () => controller.abort();
   }, [conversationId]);
 
   const handleNewChat = useCallback(() => {
@@ -319,7 +322,7 @@ export default function ChatContainer() {
         onRenameFolder={renameFolder}
         onUpdateTags={updateTags}
         activeView={activeView}
-        onViewChange={(view) => setActiveView(view as 'chat' | 'settings' | 'skills' | 'cron')}
+        onViewChange={(view) => setActiveView(view as 'chat' | 'settings' | 'skills' | 'cron' | 'knowledge')}
       />
 
       <main className="flex-1 flex flex-col min-w-0 relative">
@@ -392,6 +395,8 @@ export default function ChatContainer() {
               <CronJobEditor />
             </div>
           </div>
+        ) : activeView === 'knowledge' ? (
+          <KnowledgePanel onClose={() => setActiveView('chat')} />
         ) : (
           <div className="flex flex-1 overflow-hidden">
             {/* 채팅 영역 */}
