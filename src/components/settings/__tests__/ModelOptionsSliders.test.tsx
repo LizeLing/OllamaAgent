@@ -19,7 +19,7 @@ describe('ModelOptionsSliders', () => {
     const text = container.textContent;
     expect(text).toContain('0.7');
     expect(text).toContain('0.90');
-    expect(text).toContain('2048');
+    expect(text).toContain('2,048');
   });
 
   it('calls onChange when slider value changes', () => {

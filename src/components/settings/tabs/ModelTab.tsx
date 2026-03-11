@@ -47,6 +47,7 @@ function formatSize(bytes: number): string {
 export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
   const [models, setModels] = useState<string[]>([]);
   const [loadedModels, setLoadedModels] = useState<LoadedModel[]>([]);
+  const [modelInfo, setModelInfo] = useState<Record<string, { contextLength: number }>>({});
   const [loadingModels, setLoadingModels] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
@@ -59,6 +60,7 @@ export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
       .then((data) => {
         setModels(data.models || []);
         setLoadedModels(data.loaded || []);
+        setModelInfo(data.modelInfo || {});
       })
       .catch(() => { setModels([]); setLoadedModels([]); })
       .finally(() => setLoadingModels(false));
@@ -311,6 +313,7 @@ export default function ModelTab({ draft, onDraftChange }: ModelTabProps) {
         <ModelOptionsSliders
           options={draft.modelOptions || { temperature: 0.7, topP: 0.9, numPredict: 2048 }}
           onChange={(modelOptions) => onDraftChange({ modelOptions })}
+          maxContextLength={draft.ollamaModel ? modelInfo[draft.ollamaModel]?.contextLength : undefined}
         />
       </section>
 

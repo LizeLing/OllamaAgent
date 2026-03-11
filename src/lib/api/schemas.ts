@@ -142,7 +142,7 @@ export const settingsUpdateSchema = z.object({
   modelOptions: z.object({
     temperature: z.number().min(0).max(2).optional(),
     topP: z.number().min(0).max(1).optional(),
-    numPredict: z.number().int().min(1).max(32768).optional(),
+    numPredict: z.number().int().min(1).max(131072).optional(),
   }).optional(),
   enabledTools: z.array(z.string()).optional(),
   fallbackModels: z.array(z.string()).optional(),

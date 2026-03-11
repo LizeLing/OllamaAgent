@@ -37,7 +37,32 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ models, loaded });
+    // 각 모델의 context length 조회 (병렬, 개별 실패 허용)
+    const modelInfo: Record<string, { contextLength: number }> = {};
+    const showResults = await Promise.allSettled(
+      models.map(async (name) => {
+        const res = await fetch(`${settings.ollamaUrl}/api/show`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: name }),
+          signal: AbortSignal.timeout(3000),
+        });
+        if (!res.ok) return null;
+        const info = await res.json();
+        const ctxKey = Object.keys(info.model_info || {}).find(
+          (k) => k.endsWith('.context_length')
+        );
+        const contextLength = ctxKey ? info.model_info[ctxKey] : null;
+        return { name, contextLength };
+      })
+    );
+    for (const r of showResults) {
+      if (r.status === 'fulfilled' && r.value?.contextLength) {
+        modelInfo[r.value.name] = { contextLength: r.value.contextLength };
+      }
+    }
+
+    return NextResponse.json({ models, loaded, modelInfo });
   } catch {
     return NextResponse.json({ models: [], loaded: [] });
   }
