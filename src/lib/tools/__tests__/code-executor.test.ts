@@ -38,6 +38,7 @@ describe('CodeExecutorTool - Lazy Docker', () => {
     // static 필드 초기화를 위해 모듈 재로드
     const mod = await import('../code-executor');
     // static 필드 리셋 (private이므로 any 캐스트)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const Cls = mod.CodeExecutorTool as any;
     Cls.docker = null;
     Cls.dockerAvailable = null;
@@ -51,6 +52,7 @@ describe('CodeExecutorTool - Lazy Docker', () => {
     // Docker의 ping이 호출되지 않아야 함 (아직 execute를 호출하지 않았으므로)
     expect(mockPing).not.toHaveBeenCalled();
     // static docker 필드가 null이어야 함 (lazy 초기화)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((CodeExecutorTool as any).docker).toBeNull();
   });
 

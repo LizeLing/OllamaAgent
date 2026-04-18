@@ -6,6 +6,7 @@ import { FolderMeta } from '@/types/folder';
 import { addToast } from '@/hooks/useToast';
 import ConversationItem from './ConversationItem';
 import FolderGroup from './FolderGroup';
+import TaskList from '@/components/tasks/TaskList';
 
 const FOLDER_COLORS = [
   '#6366f1', // indigo
@@ -40,6 +41,12 @@ interface SidebarProps {
   onUpdateTags: (id: string, tags: string[]) => void;
   activeView?: string;
   onViewChange: (view: string) => void;
+  /** Task 선택 콜백 (Tasks 탭에서 TaskList 항목 클릭 시) */
+  onTaskSelect?: (taskId: string) => void;
+  /** 현재 선택된 Task ID (TaskList 강조용) */
+  activeTaskId?: string | null;
+  /** Task 목록 새로고침 토큰 */
+  taskRefreshToken?: number;
 }
 
 export default function Sidebar({
@@ -64,7 +71,12 @@ export default function Sidebar({
   onUpdateTags,
   activeView,
   onViewChange,
+  onTaskSelect,
+  activeTaskId,
+  taskRefreshToken = 0,
 }: SidebarProps) {
+  // activeView === 'tasks'에 파생된 탭 상태 — 상위 상태와 동기화하는 단일 소스
+  const sidebarTab: 'chats' | 'tasks' = activeView === 'tasks' ? 'tasks' : 'chats';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -197,8 +209,40 @@ export default function Sidebar({
           </button>
         </div>
 
+        {/* Chats / Tasks 탭 */}
+        <div className="border-b border-border px-3 py-2" role="tablist" aria-label="사이드바 뷰 전환">
+          <div className="inline-flex w-full items-center gap-1 rounded-lg border border-border bg-card p-0.5">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sidebarTab === 'chats'}
+              onClick={() => onViewChange('chat')}
+              className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                sidebarTab === 'chats'
+                  ? 'bg-accent/20 text-accent'
+                  : 'text-muted hover:text-foreground hover:bg-card-hover'
+              }`}
+            >
+              Chats
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sidebarTab === 'tasks'}
+              onClick={() => onViewChange('tasks')}
+              className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                sidebarTab === 'tasks'
+                  ? 'bg-accent/20 text-accent'
+                  : 'text-muted hover:text-foreground hover:bg-card-hover'
+              }`}
+            >
+              Tasks
+            </button>
+          </div>
+        </div>
+
         {/* New folder input */}
-        {showNewFolder && (
+        {sidebarTab === 'chats' && showNewFolder && (
           <div className="px-3 py-2 border-b border-border space-y-2">
             <div className="flex gap-2">
               <input
@@ -230,20 +274,22 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* Search */}
-        <div className="px-3 py-2">
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="대화 검색..."
-            aria-label="대화 검색"
-            className="w-full text-sm bg-card text-foreground placeholder:text-muted rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-accent border border-border"
-          />
-        </div>
+        {/* Search (Chats 탭 전용) */}
+        {sidebarTab === 'chats' && (
+          <div className="px-3 py-2">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder="대화 검색..."
+              aria-label="대화 검색"
+              className="w-full text-sm bg-card text-foreground placeholder:text-muted rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-accent border border-border"
+            />
+          </div>
+        )}
 
         {/* Tag filter */}
-        {allTags.length > 0 && !searchQuery && (
+        {sidebarTab === 'chats' && allTags.length > 0 && !searchQuery && (
           <div className="px-3 py-1 flex gap-1 flex-wrap">
             {activeTag && (
               <button
@@ -269,51 +315,64 @@ export default function Sidebar({
           </div>
         )}
 
-        {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto px-2 py-1" role="list" aria-label="대화 목록">
-          {filtered.length === 0 ? (
-            <div className="text-center text-muted text-xs py-8">
-              {searchQuery ? '검색 결과가 없습니다' : '대화가 없습니다'}
-            </div>
-          ) : (
-            <>
-              {/* Pinned section */}
-              {pinned.length > 0 && (
-                <div className="mb-2">
-                  <div className="px-2 py-1 text-[10px] font-medium text-muted uppercase tracking-wider">고정됨</div>
-                  <div className="space-y-0.5">{pinned.map(renderItem)}</div>
-                </div>
-              )}
+        {/* 본문 — 탭별 목록 */}
+        {sidebarTab === 'chats' ? (
+          <div className="flex-1 overflow-y-auto px-2 py-1" role="list" aria-label="대화 목록">
+            {filtered.length === 0 ? (
+              <div className="text-center text-muted text-xs py-8">
+                {searchQuery ? '검색 결과가 없습니다' : '대화가 없습니다'}
+              </div>
+            ) : (
+              <>
+                {/* Pinned section */}
+                {pinned.length > 0 && (
+                  <div className="mb-2">
+                    <div className="px-2 py-1 text-[10px] font-medium text-muted uppercase tracking-wider">고정됨</div>
+                    <div className="space-y-0.5">{pinned.map(renderItem)}</div>
+                  </div>
+                )}
 
-              {/* Folder groups */}
-              {folders.map((folder) => {
-                const items = byFolder.get(folder.id) || [];
-                if (items.length === 0 && searchQuery) return null;
-                return (
-                  <FolderGroup
-                    key={folder.id}
-                    folder={folder}
-                    count={items.length}
-                    onRename={onRenameFolder}
-                    onDelete={onDeleteFolder}
-                  >
-                    <div className="space-y-0.5">{items.map(renderItem)}</div>
-                  </FolderGroup>
-                );
-              })}
+                {/* Folder groups */}
+                {folders.map((folder) => {
+                  const items = byFolder.get(folder.id) || [];
+                  if (items.length === 0 && searchQuery) return null;
+                  return (
+                    <FolderGroup
+                      key={folder.id}
+                      folder={folder}
+                      count={items.length}
+                      onRename={onRenameFolder}
+                      onDelete={onDeleteFolder}
+                    >
+                      <div className="space-y-0.5">{items.map(renderItem)}</div>
+                    </FolderGroup>
+                  );
+                })}
 
-              {/* Uncategorized */}
-              {uncategorized.length > 0 && (
-                <div className="mb-2">
-                  {(folders.length > 0 || pinned.length > 0) && (
-                    <div className="px-2 py-1 text-[10px] font-medium text-muted uppercase tracking-wider">미분류</div>
-                  )}
-                  <div className="space-y-0.5">{uncategorized.map(renderItem)}</div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+                {/* Uncategorized */}
+                {uncategorized.length > 0 && (
+                  <div className="mb-2">
+                    {(folders.length > 0 || pinned.length > 0) && (
+                      <div className="px-2 py-1 text-[10px] font-medium text-muted uppercase tracking-wider">미분류</div>
+                    )}
+                    <div className="space-y-0.5">{uncategorized.map(renderItem)}</div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-2 py-1" aria-label="Task 목록">
+            <TaskList
+              activeTaskId={activeTaskId ?? null}
+              onSelect={(id) => {
+                onTaskSelect?.(id);
+                onClose();
+              }}
+              refreshToken={taskRefreshToken}
+            />
+          </div>
+        )}
 
         {/* Bottom actions */}
         <div className="p-3 border-t border-border space-y-2">

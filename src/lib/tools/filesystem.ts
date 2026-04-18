@@ -3,6 +3,7 @@ import { ToolDefinition, ToolResult } from '@/lib/agent/types';
 import fs from 'fs/promises';
 import path from 'path';
 import { glob } from 'glob';
+import { minimatch } from 'minimatch';
 
 function isPathAllowed(
   targetPath: string,
@@ -14,6 +15,38 @@ function isPathAllowed(
   if (isDenied) return false;
   if (allowedPaths.length === 0) return true;
   return allowedPaths.some((a) => resolved.startsWith(a));
+}
+
+/**
+ * Task Mode writeScope 검증.
+ * - writeScope가 undefined이면 제약 없음
+ * - writeScope가 빈 배열 []이면 모든 쓰기를 거부(allowlist 의미상)
+ * - writeScope의 glob 중 하나라도 대상 경로(repo cwd 기준 상대)에 매칭되면 허용
+ * - cwd 밖 경로는 항상 거부한다
+ */
+export function isWithinWriteScope(
+  targetAbsolutePath: string,
+  writeScope: string[] | undefined,
+  cwd: string = process.cwd()
+): { ok: true } | { ok: false; reason: string } {
+  if (writeScope === undefined) return { ok: true };
+  const resolved = path.resolve(targetAbsolutePath);
+  const rel = path.relative(cwd, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    return { ok: false, reason: `writeScope 밖의 경로입니다 (cwd 바깥): ${targetAbsolutePath}` };
+  }
+  if (writeScope.length === 0) {
+    return { ok: false, reason: `writeScope가 비어 있어 모든 쓰기가 차단됩니다: ${targetAbsolutePath}` };
+  }
+  const normalized = rel.split(path.sep).join('/');
+  const matched = writeScope.some((pattern) => minimatch(normalized, pattern, { dot: true }));
+  if (!matched) {
+    return {
+      ok: false,
+      reason: `이 Task의 writeScope 밖입니다: ${normalized} (허용: ${writeScope.join(', ')})`,
+    };
+  }
+  return { ok: true };
 }
 
 export class FilesystemReadTool extends BaseTool {
@@ -60,7 +93,8 @@ export class FilesystemWriteTool extends BaseTool {
 
   constructor(
     private allowedPaths: string[],
-    private deniedPaths: string[]
+    private deniedPaths: string[],
+    private writeScope?: string[]
   ) {
     super();
   }
@@ -71,6 +105,10 @@ export class FilesystemWriteTool extends BaseTool {
     if (!filePath || content === undefined) return this.error('path and content are required');
     if (!isPathAllowed(filePath, this.allowedPaths, this.deniedPaths)) {
       return this.error(`Access denied: ${filePath}`);
+    }
+    const scopeCheck = isWithinWriteScope(filePath, this.writeScope);
+    if (!scopeCheck.ok) {
+      return this.error(scopeCheck.reason);
     }
     try {
       await fs.mkdir(path.dirname(filePath), { recursive: true });

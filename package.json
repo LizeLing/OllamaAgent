@@ -2,6 +2,7 @@
   "name": "ollama-agent",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -22,6 +23,7 @@
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "mammoth": "^1.11.0",
+    "minimatch": "^10.2.5",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",

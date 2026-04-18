@@ -82,7 +82,21 @@ import { DelegateToSubAgentTool } from '@/lib/agent/subagent-tool';
 import { AgentConfig } from '@/lib/agent/types';
 
 export function registerSubAgentTool(config: AgentConfig): void {
-  toolRegistry.register(new DelegateToSubAgentTool(config));
+  toolRegistry.register(new DelegateToSubAgentTool(config, config.taskContext));
+}
+
+/**
+ * Task Mode에서 writeScope가 지정된 경우, 기존 filesystem_write 도구를 writeScope 검증이 포함된
+ * 인스턴스로 교체한다. taskContext가 없거나 writeScope가 undefined이면 아무것도 하지 않는다.
+ */
+export function registerTaskModeFilesystemTools(
+  config: AgentConfig,
+  allowedPaths: string[],
+  deniedPaths: string[]
+): void {
+  const writeScope = config.taskContext?.writeScope;
+  if (writeScope === undefined) return;
+  toolRegistry.register(new FilesystemWriteTool(allowedPaths, deniedPaths, writeScope));
 }
 
 const settingsCache = new MtimeCache<{ mcpServers?: McpServerConfig[] }>(

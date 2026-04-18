@@ -61,6 +61,10 @@ vi.mock('@/lib/agent/approval', () => ({
   waitForApproval: vi.fn(() => Promise.resolve(true)),
 }));
 
+vi.mock('@/lib/tasks/context-builder', () => ({
+  buildResumeContext: vi.fn(),
+}));
+
 // ── Imports (after mocks) ──
 
 import { NextRequest } from 'next/server';
@@ -70,6 +74,7 @@ import { loadSettings } from '@/lib/config/settings';
 import { initializeTools } from '@/lib/tools/init';
 import { runAgentLoop } from '@/lib/agent/agent-loop';
 import { MemoryManager } from '@/lib/memory/memory-manager';
+import { buildResumeContext } from '@/lib/tasks/context-builder';
 
 // ── Helpers ──
 
@@ -258,5 +263,49 @@ describe('POST /api/chat', () => {
       expect.any(String), expect.any(String), expect.any(String),
       'ollama', 'my-key'
     );
+  });
+
+  it('taskMode === "task" + taskId가 있으면 buildResumeContext를 호출하고 systemPrompt에 주입한다', async () => {
+    vi.mocked(buildResumeContext).mockResolvedValueOnce({
+      taskId: 'task_1',
+      checkpointId: 'cp_1',
+      systemPrompt: 'TASK_RESUME_PROMPT_MARKER',
+      metadata: {
+        title: 'T',
+        goal: 'G',
+        status: 'active',
+        progress: 0.5,
+        totalTasks: 2,
+        doneTasks: 1,
+        hasCheckpoint: true,
+      },
+    } as unknown as Awaited<ReturnType<typeof buildResumeContext>>);
+
+    await POST(
+      makeRequest({ message: 'hi', taskMode: 'task', taskId: 'task_1' }),
+    );
+
+    expect(buildResumeContext).toHaveBeenCalledWith('task_1', expect.any(Object));
+    const config = vi.mocked(runAgentLoop).mock.calls[0][0];
+    expect(config.systemPrompt).toContain('TASK_RESUME_PROMPT_MARKER');
+  });
+
+  it('taskMode가 "task"가 아니면 buildResumeContext를 호출하지 않는다 (Chat Mode 회귀 방지)', async () => {
+    vi.mocked(buildResumeContext).mockClear();
+
+    await POST(makeRequest({ message: 'hi' }));
+
+    expect(buildResumeContext).not.toHaveBeenCalled();
+  });
+
+  it('taskMode="task"이지만 buildResumeContext가 throw하면 요청은 계속 진행된다', async () => {
+    vi.mocked(buildResumeContext).mockRejectedValueOnce(new Error('resume fail'));
+
+    const res = await POST(
+      makeRequest({ message: 'hi', taskMode: 'task', taskId: 'task_x' }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(runAgentLoop).toHaveBeenCalled();
   });
 });

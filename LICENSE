@@ -1,0 +1,63 @@
+Proprietary License
+
+Copyright (c) 2026 GameCanvas. All rights reserved.
+
+This software and associated documentation files (the "Software") are the
+proprietary and confidential property of the copyright holder. Unauthorized
+copying, distribution, modification, public display, public performance, or
+creation of derivative works of the Software, in whole or in part, by any
+means is strictly prohibited without the prior written consent of the
+copyright holder.
+
+No license, express or implied, by estoppel or otherwise, to any intellectual
+property rights is granted by this document.
+
+THIRD-PARTY COMPONENTS
+
+The Software depends on third-party open source libraries distributed under
+their respective licenses (including MIT, ISC, BSD-2-Clause, BSD-3-Clause,
+Apache-2.0, MPL-2.0, LGPL-3.0-or-later, and others). These components remain
+the property of their respective owners and are governed by their own license
+terms. This proprietary notice applies only to the original code authored for
+this project and does not modify or supersede the terms of any third-party
+component.
+
+DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+독점 라이선스 (Proprietary License)
+
+Copyright (c) 2026 GameCanvas. All rights reserved.
+
+본 소프트웨어 및 관련 문서 파일(이하 "소프트웨어")은 저작권자의 독점적이고
+비밀스러운 자산입니다. 저작권자의 사전 서면 동의 없이 소프트웨어의 전부
+또는 일부를 어떠한 수단으로도 무단 복제, 배포, 수정, 공개, 공연하거나
+2차적 저작물로 작성하는 행위는 엄격히 금지됩니다.
+
+본 문서는 금반언(estoppel) 또는 그 외 어떠한 방식으로도 지적재산권에 대한
+명시적 또는 묵시적 라이선스를 부여하지 않습니다.
+
+제3자 구성요소
+
+본 소프트웨어는 각자의 라이선스(MIT, ISC, BSD-2-Clause, BSD-3-Clause,
+Apache-2.0, MPL-2.0, LGPL-3.0-or-later 등)에 따라 배포되는 오픈소스
+라이브러리에 의존합니다. 해당 구성요소는 각 저작권자의 자산이며 각자의
+라이선스 조건에 따라 관리됩니다. 본 독점 고지는 본 프로젝트를 위해
+새로 작성된 코드에만 적용되며, 제3자 구성요소의 라이선스 조건을
+수정하거나 대체하지 않습니다.
+
+면책 고지
+
+본 소프트웨어는 상품성, 특정 목적에의 적합성 및 비침해에 대한 보증을
+포함하되 이에 국한되지 않는 어떠한 종류의 명시적 또는 묵시적 보증 없이
+"있는 그대로" 제공됩니다. 저작권자는 계약, 불법행위 또는 그 밖의 행위로
+발생하는 소프트웨어 또는 소프트웨어의 사용이나 기타 처리와 관련하여
+발생하는 어떠한 청구, 손해 또는 기타 책임에 대해서도 책임지지 않습니다.

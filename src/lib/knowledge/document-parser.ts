@@ -134,7 +134,11 @@ async function parseDocx(content: Buffer): Promise<ParsedSection[]> {
 async function parseXlsx(content: Buffer): Promise<ParsedSection[]> {
   try {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(content);
+    const arrayBuffer = content.buffer.slice(
+      content.byteOffset,
+      content.byteOffset + content.byteLength,
+    ) as ArrayBuffer;
+    await workbook.xlsx.load(arrayBuffer);
 
     const sections: ParsedSection[] = [];
 

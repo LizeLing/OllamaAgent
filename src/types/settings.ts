@@ -22,6 +22,8 @@ export interface CustomToolDef {
   headers?: Record<string, string>;
   bodyTemplate?: string;
   parameters: { name: string; type: string; description: string; required: boolean }[];
+  /** true면 Plan 모드에서 자동 차단 */
+  destructive?: boolean;
 }
 
 export interface McpServerConfig {
@@ -67,4 +69,6 @@ export interface Settings {
   numParallel: number;
   maxLoadedModels: number;
   memoryCategories: Record<string, MemoryCategoryConfig>;
+  /** 기본 Plan 모드 활성화 여부 (기본: false) */
+  defaultPlanMode?: boolean;
 }

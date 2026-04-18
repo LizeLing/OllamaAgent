@@ -14,8 +14,9 @@ vi.mock('glob', () => ({
 }));
 
 import fs from 'fs/promises';
+import path from 'path';
 import { glob } from 'glob';
-import { FilesystemReadTool, FilesystemWriteTool, FilesystemListTool, FilesystemSearchTool } from '../filesystem';
+import { FilesystemReadTool, FilesystemWriteTool, FilesystemListTool, FilesystemSearchTool, isWithinWriteScope } from '../filesystem';
 
 describe('FilesystemReadTool', () => {
   const allowedPaths = ['/tmp', '/home'];
@@ -164,5 +165,89 @@ describe('FilesystemSearchTool', () => {
     const result = await tool.execute({ pattern: '**/*.xyz', cwd: '/tmp' });
     expect(result.success).toBe(true);
     expect(result.output).toBe('No files found');
+  });
+});
+
+describe('isWithinWriteScope', () => {
+  const cwd = '/repo';
+
+  it('writeScope가 undefined이면 항상 허용한다', () => {
+    const result = isWithinWriteScope('/repo/src/a.ts', undefined, cwd);
+    expect(result.ok).toBe(true);
+  });
+
+  it('writeScope가 빈 배열이면 모든 쓰기를 거부한다', () => {
+    const result = isWithinWriteScope('/repo/src/a.ts', [], cwd);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('비어 있어');
+  });
+
+  it('glob 패턴에 매칭되는 경로를 허용한다', () => {
+    const result = isWithinWriteScope('/repo/src/lib/foo.ts', ['src/**/*.ts'], cwd);
+    expect(result.ok).toBe(true);
+  });
+
+  it('writeScope 밖의 경로를 거부한다', () => {
+    const result = isWithinWriteScope('/repo/docs/readme.md', ['src/**/*.ts'], cwd);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('writeScope 밖');
+  });
+
+  it('cwd 바깥의 절대경로를 거부한다', () => {
+    const result = isWithinWriteScope('/etc/passwd', ['src/**/*.ts'], cwd);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('cwd 바깥');
+  });
+
+  it('여러 패턴 중 하나라도 매칭하면 허용한다', () => {
+    const result = isWithinWriteScope(
+      '/repo/data/tasks/task_1.json',
+      ['src/**/*.ts', 'data/tasks/**'],
+      cwd,
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('상대경로로 주어져도 cwd와 결합해 해석한다', () => {
+    const abs = path.join(cwd, 'src/a.ts');
+    const result = isWithinWriteScope(abs, ['src/*.ts'], cwd);
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('FilesystemWriteTool (writeScope)', () => {
+  const allowedPaths = [process.cwd()];
+  const deniedPaths: string[] = [];
+
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('writeScope가 없으면 기존 동작(모든 경로 허용)을 유지한다', async () => {
+    const tool = new FilesystemWriteTool(allowedPaths, deniedPaths);
+    const target = path.join(process.cwd(), 'tmp-test.txt');
+    const result = await tool.execute({ path: target, content: 'hi' });
+    expect(result.success).toBe(true);
+  });
+
+  it('writeScope 매칭 시 쓰기 허용', async () => {
+    const tool = new FilesystemWriteTool(allowedPaths, deniedPaths, ['tmp/**/*.txt']);
+    const target = path.join(process.cwd(), 'tmp/sub/a.txt');
+    const result = await tool.execute({ path: target, content: 'hi' });
+    expect(result.success).toBe(true);
+  });
+
+  it('writeScope 미매칭 시 쓰기 차단', async () => {
+    const tool = new FilesystemWriteTool(allowedPaths, deniedPaths, ['tmp/**/*.txt']);
+    const target = path.join(process.cwd(), 'src/lib/a.ts');
+    const result = await tool.execute({ path: target, content: 'hi' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('writeScope');
+  });
+
+  it('writeScope가 빈 배열이면 모든 쓰기 차단', async () => {
+    const tool = new FilesystemWriteTool(allowedPaths, deniedPaths, []);
+    const target = path.join(process.cwd(), 'tmp/a.txt');
+    const result = await tool.execute({ path: target, content: 'hi' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('비어 있어');
   });
 });

@@ -198,3 +198,185 @@ describe('useChat', () => {
     expect(body.format).toBeUndefined();
   });
 });
+
+describe('useChat - Task Mode', () => {
+  it('초기 상태에서 taskId는 null, taskMode는 chat이다', () => {
+    const { result } = renderHook(() => useChat());
+    expect(result.current.taskId).toBeNull();
+    expect(result.current.taskMode).toBe('chat');
+  });
+
+  it('handleTaskCommand new는 /api/tasks에 POST 요청을 보내고 taskId/taskMode를 설정한다', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: 'task_1', title: '목표 샘플' }),
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    let cmdRes: Awaited<ReturnType<typeof result.current.handleTaskCommand>> | undefined;
+    await act(async () => {
+      cmdRes = await result.current.handleTaskCommand(['new 목표 샘플']);
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/tasks',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('목표 샘플'),
+      }),
+    );
+    expect(cmdRes?.ok).toBe(true);
+    expect(cmdRes?.taskId).toBe('task_1');
+    expect(result.current.taskId).toBe('task_1');
+    expect(result.current.taskMode).toBe('task');
+  });
+
+  it('handleTaskCommand open은 GET /api/tasks/:id로 로드하고 Task Mode로 전환한다', async () => {
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: 'task_abc', title: '기존 Task' }),
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.handleTaskCommand(['open task_abc']);
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/tasks/task_abc');
+    expect(result.current.taskId).toBe('task_abc');
+    expect(result.current.taskMode).toBe('task');
+  });
+
+  it('handleTaskCommand new는 goal이 없으면 실패 응답을 반환한다', async () => {
+    global.fetch = vi.fn();
+    const { result } = renderHook(() => useChat());
+
+    let res: Awaited<ReturnType<typeof result.current.handleTaskCommand>> | undefined;
+    await act(async () => {
+      res = await result.current.handleTaskCommand(['new']);
+    });
+
+    expect(res?.ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('handleTaskCommand sub-command가 없으면 usage 안내 메시지를 반환한다', async () => {
+    const { result } = renderHook(() => useChat());
+    let res: Awaited<ReturnType<typeof result.current.handleTaskCommand>> | undefined;
+    await act(async () => {
+      res = await result.current.handleTaskCommand(['']);
+    });
+    expect(res?.ok).toBe(false);
+    expect(res?.message).toMatch(/사용법/);
+  });
+
+  it('handleTaskCommand checkpoint는 활성 taskId가 없으면 실패한다', async () => {
+    global.fetch = vi.fn();
+    const { result } = renderHook(() => useChat());
+    let res: Awaited<ReturnType<typeof result.current.handleTaskCommand>> | undefined;
+    await act(async () => {
+      res = await result.current.handleTaskCommand(['checkpoint']);
+    });
+    expect(res?.ok).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('Task Mode 활성 상태에서 sendMessage는 body에 taskId와 taskMode를 포함한다', async () => {
+    const sseData = 'event: token\ndata: {"content":"ok"}\n\nevent: done\ndata: {}\n\n';
+    global.fetch = vi
+      .fn()
+      // 1) handleTaskCommand new 호출
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'task_x', title: 't' }),
+      })
+      // 2) sendMessage 호출
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(sseData));
+            controller.close();
+          },
+        }),
+      });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.handleTaskCommand(['new 목표']);
+    });
+    expect(result.current.taskMode).toBe('task');
+
+    await act(async () => {
+      await result.current.sendMessage('hello');
+    });
+
+    const calls = vi.mocked(global.fetch).mock.calls;
+    const chatCall = calls.find((c) => c[0] === '/api/chat');
+    expect(chatCall).toBeDefined();
+    const body = JSON.parse(chatCall![1]!.body as string);
+    expect(body.taskId).toBe('task_x');
+    expect(body.taskMode).toBe('task');
+  });
+
+  it('Chat Mode에서 sendMessage는 body에 taskId / taskMode를 포함하지 않는다', async () => {
+    const sseData = 'event: token\ndata: {"content":"ok"}\n\nevent: done\ndata: {}\n\n';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(sseData));
+          controller.close();
+        },
+      }),
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage('hi');
+    });
+
+    const calls = vi.mocked(global.fetch).mock.calls;
+    const body = JSON.parse(calls[0][1]?.body as string);
+    expect(body.taskId).toBeUndefined();
+    expect(body.taskMode).toBeUndefined();
+  });
+
+  it('handleTaskCommand done은 taskId 초기화 후 Chat Mode로 복귀한다', async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 'task_close', title: 'c' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.handleTaskCommand(['new 목표']);
+    });
+    expect(result.current.taskMode).toBe('task');
+
+    await act(async () => {
+      await result.current.handleTaskCommand(['done']);
+    });
+
+    expect(result.current.taskId).toBeNull();
+    expect(result.current.taskMode).toBe('chat');
+  });
+});

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { KnowledgeDocument } from '@/types/knowledge';
 
 interface DocumentListProps {
@@ -8,6 +8,7 @@ interface DocumentListProps {
   loading: boolean;
   onUpload: (files: FileList) => void;
   onDelete: (id: string) => void;
+  onAddDirectory: (directoryPath: string) => void;
 }
 
 const ACCEPTED_FORMATS = '.md,.txt,.ts,.tsx,.js,.jsx,.py,.java,.go,.rs,.c,.cpp,.h,.css,.html,.json,.yaml,.yml,.docx,.xlsx,.pptx';
@@ -29,20 +30,39 @@ const FORMAT_ICONS: Record<string, string> = {
   docx: '📘', xlsx: '📊', pptx: '📙',
 };
 
-export default function DocumentList({ documents, loading, onUpload, onDelete }: DocumentListProps) {
+export default function DocumentList({ documents, loading, onUpload, onDelete, onAddDirectory }: DocumentListProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDirInput, setShowDirInput] = useState(false);
+  const [dirPath, setDirPath] = useState('');
+
+  const handleAddDirectory = () => {
+    const trimmed = dirPath.trim();
+    if (!trimmed) return;
+    onAddDirectory(trimmed);
+    setDirPath('');
+    setShowDirInput(false);
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted">{documents.length}개 문서</p>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={loading}
-          className="px-2 py-1 text-xs bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
-        >
-          {loading ? '처리 중...' : '+ 문서 추가'}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowDirInput((v) => !v)}
+            disabled={loading}
+            className="px-2 py-1 text-xs bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
+          >
+            {showDirInput ? '취소' : '+ 디렉토리'}
+          </button>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="px-2 py-1 text-xs bg-accent/20 text-accent rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
+          >
+            {loading ? '처리 중...' : '+ 파일'}
+          </button>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
@@ -57,6 +77,27 @@ export default function DocumentList({ documents, loading, onUpload, onDelete }:
           }}
         />
       </div>
+
+      {showDirInput && (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={dirPath}
+            onChange={(e) => setDirPath(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddDirectory(); }}
+            placeholder="/path/to/directory"
+            className="flex-1 px-2 py-1.5 text-xs bg-card border border-border rounded-lg focus:outline-none focus:border-accent"
+            autoFocus
+          />
+          <button
+            onClick={handleAddDirectory}
+            disabled={loading || !dirPath.trim()}
+            className="px-2 py-1.5 text-xs bg-accent text-white rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
+          >
+            추가
+          </button>
+        </div>
+      )}
 
       {loading && (
         <div className="text-center py-4">

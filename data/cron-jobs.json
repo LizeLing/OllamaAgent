@@ -21,9 +21,9 @@
     "jobConfig": {},
     "enabled": true,
     "createdAt": 1772730862654,
-    "runCount": 19,
-    "nextRunAt": 1772803800000,
-    "lastRunAt": 1772802026514
+    "runCount": 48,
+    "nextRunAt": 1773241200000,
+    "lastRunAt": 1773239423730
   },
   {
     "id": "default-stats-snapshot",

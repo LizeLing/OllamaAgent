@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useSettings } from '@/hooks/useSettings';
 import { useConversations } from '@/hooks/useConversations';
@@ -14,6 +14,7 @@ import CronJobEditor from '@/components/settings/CronJobEditor';
 import HelpTooltip from '@/components/ui/HelpTooltip';
 import Sidebar from '@/components/sidebar/Sidebar';
 import ToolApprovalModal from '@/components/chat/ToolApprovalModal';
+import PlanApprovalModal from '@/components/chat/PlanApprovalModal';
 import ShortcutGuide from '@/components/ui/ShortcutGuide';
 import StatsPanel from '@/components/ui/StatsPanel';
 import ToolLogPanel from '@/components/ui/ToolLogPanel';
@@ -22,6 +23,26 @@ import KnowledgePanel from '@/components/knowledge/KnowledgePanel';
 import { Artifact } from '@/types/artifacts';
 import { useCommands } from './useCommands';
 import { useDragDrop } from './useDragDrop';
+import TaskDetail from '@/components/tasks/TaskDetail';
+
+// SSR-safe media query subscription: client에서만 실제 값을 구독, server snapshot은 항상 false.
+const DESKTOP_QUERY = '(min-width: 768px)';
+
+function subscribeDesktopMediaQuery(callback: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const mq = window.matchMedia(DESKTOP_QUERY);
+  mq.addEventListener('change', callback);
+  return () => mq.removeEventListener('change', callback);
+}
+
+function getDesktopSnapshot(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia(DESKTOP_QUERY).matches;
+}
+
+function getDesktopServerSnapshot(): boolean {
+  return false;
+}
 
 export default function ChatContainer() {
   const {
@@ -30,6 +51,8 @@ export default function ChatContainer() {
     sendMessage,
     editMessage,
     regenerate,
+    rewindTo,
+    forkAt,
     stopGeneration,
     clearMessages,
     addSystemMessage,
@@ -39,6 +62,13 @@ export default function ChatContainer() {
     saveToServer,
     pendingApproval,
     respondToApproval,
+    pendingPlan,
+    approvePlan,
+    requestPlanRevision,
+    cancelPlan,
+    taskId,
+    taskMode,
+    handleTaskCommand,
   } = useChat();
   const { settings, updateSettings } = useSettings();
   const {
@@ -59,17 +89,21 @@ export default function ChatContainer() {
     deleteFolder: deleteFolderFn,
     renameFolder,
   } = useConversations();
-  const [activeView, setActiveView] = useState<'chat' | 'settings' | 'skills' | 'cron' | 'knowledge'>('chat');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'chat' | 'settings' | 'skills' | 'cron' | 'knowledge' | 'tasks'>('chat');
 
-  // 화면 크기에 따른 사이드바 상태 + 리사이즈 감지
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    setSidebarOpen(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+  // 화면 폭(외부 매체)을 useSyncExternalStore로 구독 — SSR 시에는 false로 시작하여 hydration mismatch를 피함
+  const isDesktop = useSyncExternalStore(subscribeDesktopMediaQuery, getDesktopSnapshot, getDesktopServerSnapshot);
+  // 사용자 토글(햄버거/스와이프)로 직접 연 경우의 오버라이드 플래그.
+  // null 이면 isDesktop을 그대로 사용, boolean 이면 그 값을 강제.
+  const [sidebarOverride, setSidebarOverride] = useState<boolean | null>(null);
+  const sidebarOpen = sidebarOverride ?? isDesktop;
+  const setSidebarOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    setSidebarOverride((prev) => {
+      const base = prev ?? isDesktop;
+      const resolved = typeof next === 'function' ? (next as (prev: boolean) => boolean)(base) : next;
+      return resolved;
+    });
+  }, [isDesktop]);
   const [shortcutGuideOpen, setShortcutGuideOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [toolLogOpen, setToolLogOpen] = useState(false);
@@ -77,6 +111,8 @@ export default function ChatContainer() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [taskRefreshToken, setTaskRefreshToken] = useState(0);
   const prevMessagesLenRef = useRef(0);
   const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -199,33 +235,22 @@ export default function ChatContainer() {
 
   // Branch conversation from a specific message
   const handleBranch = useCallback(async (messageId: string) => {
-    const msgIndex = messages.findIndex((m) => m.id === messageId);
-    if (msgIndex === -1) return;
-
-    const branchedMessages = messages.slice(0, msgIndex + 1);
-    const newId = await createConversation('분기된 대화');
+    const newId = await forkAt(messageId);
     if (!newId) return;
+    setConversationId(newId);
+    setActiveId(newId);
+    await loadConversation(newId);
+    prevMessagesLenRef.current = 0;
+    fetchConversations();
+  }, [forkAt, setConversationId, setActiveId, loadConversation, fetchConversations]);
 
-    try {
-      await fetch(`/api/conversations/${newId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: branchedMessages,
-          branchedFrom: conversationId ? { conversationId, messageIndex: msgIndex } : undefined,
-        }),
-      });
-      setConversationId(newId);
-      setActiveId(newId);
-      await loadConversation(newId);
-      prevMessagesLenRef.current = 0;
-      fetchConversations();
-      addToast('info', '대화가 분기되었습니다.');
-    } catch (err) {
-      console.error('[handleBranch]', err);
-      addToast('error', '대화 분기에 실패했습니다.');
-    }
-  }, [messages, conversationId, createConversation, setConversationId, setActiveId, loadConversation, fetchConversations]);
+  // Rewind conversation to a specific message (keep it, drop later messages)
+  const handleRewind = useCallback(async (messageId: string) => {
+    const ok = await rewindTo(messageId);
+    if (!ok) return;
+    prevMessagesLenRef.current = 0;
+    fetchConversations();
+  }, [rewindTo, fetchConversations]);
 
   const handleExport = useCallback(async (id: string, format: 'json' | 'markdown') => {
     try {
@@ -258,6 +283,14 @@ export default function ChatContainer() {
     handleExport,
     handleSend,
     setSelectedModel,
+    handleTaskCommand,
+    onTaskCommandSuccess: (result) => {
+      if (result.taskId) {
+        setSelectedTaskId(result.taskId);
+        setActiveView('tasks');
+      }
+      setTaskRefreshToken((t) => t + 1);
+    },
   });
 
   const handleImport = useCallback(() => {
@@ -289,7 +322,7 @@ export default function ChatContainer() {
       setSidebarOpen(true);
     }
     touchStartRef.current = null;
-  }, []);
+  }, [setSidebarOpen]);
 
   return (
     <div
@@ -322,7 +355,10 @@ export default function ChatContainer() {
         onRenameFolder={renameFolder}
         onUpdateTags={updateTags}
         activeView={activeView}
-        onViewChange={(view) => setActiveView(view as 'chat' | 'settings' | 'skills' | 'cron' | 'knowledge')}
+        onViewChange={(view) => setActiveView(view as 'chat' | 'settings' | 'skills' | 'cron' | 'knowledge' | 'tasks')}
+        onTaskSelect={setSelectedTaskId}
+        activeTaskId={selectedTaskId}
+        taskRefreshToken={taskRefreshToken}
       />
 
       <main className="flex-1 flex flex-col min-w-0 relative">
@@ -397,6 +433,31 @@ export default function ChatContainer() {
           </div>
         ) : activeView === 'knowledge' ? (
           <KnowledgePanel onClose={() => setActiveView('chat')} />
+        ) : activeView === 'tasks' ? (
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {taskMode === 'task' && taskId && (
+              <div className="flex items-center gap-2 border-b border-border px-4 py-2 text-[11px] text-accent">
+                Task Mode · <span className="font-mono">{taskId}</span>
+              </div>
+            )}
+            <div className="flex flex-1 overflow-hidden">
+              {selectedTaskId ? (
+                <TaskDetail
+                  taskId={selectedTaskId}
+                  refreshToken={taskRefreshToken}
+                  onCheckpointCreated={() => setTaskRefreshToken((t) => t + 1)}
+                />
+              ) : (
+                <div className="flex flex-1 items-center justify-center px-6 text-center text-sm text-muted">
+                  <div>
+                    <p className="mb-1">좌측 사이드바에서 Task를 선택하거나</p>
+                    <p className="font-mono text-foreground">/task new &lt;목표&gt;</p>
+                    <p className="mt-1">으로 새 Task를 시작하세요.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="flex flex-1 overflow-hidden">
             {/* 채팅 영역 */}
@@ -409,6 +470,7 @@ export default function ChatContainer() {
                 onRegenerate={regenerate}
                 onSend={(msg) => handleSend(msg)}
                 onBranch={handleBranch}
+                onRewind={handleRewind}
               />
 
               {/* Input */}
@@ -456,6 +518,17 @@ export default function ChatContainer() {
           toolInput={pendingApproval.toolInput}
           confirmId={pendingApproval.confirmId}
           onRespond={respondToApproval}
+        />
+      )}
+
+      {/* Plan Approval Modal */}
+      {pendingPlan && (
+        <PlanApprovalModal
+          plan={pendingPlan.plan}
+          blockedTools={pendingPlan.blockedTools}
+          onApprove={approvePlan}
+          onReviseRequest={requestPlanRevision}
+          onCancel={cancelPlan}
         />
       )}
 

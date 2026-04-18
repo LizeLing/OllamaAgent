@@ -78,4 +78,55 @@ describe('MessageBubble', () => {
     fireEvent.click(branchBtn);
     expect(onBranch).toHaveBeenCalledWith('test-1');
   });
+
+  describe('onRewind action', () => {
+    it('assistant 메시지에서 되돌리기 버튼이 렌더되고 onRewind를 호출한다', () => {
+      const onRewind = vi.fn();
+      render(
+        <MessageBubble
+          message={makeMessage({ id: 'asst-1', role: 'assistant', content: 'answer' })}
+          onRewind={onRewind}
+        />
+      );
+      const buttons = screen.getAllByTitle('여기로 되돌리기');
+      expect(buttons.length).toBeGreaterThan(0);
+      fireEvent.click(buttons[0]);
+      expect(onRewind).toHaveBeenCalledWith('asst-1');
+    });
+
+    it('user 메시지에서 되돌리기 버튼이 렌더되고 onRewind를 호출한다', () => {
+      const onRewind = vi.fn();
+      render(
+        <MessageBubble
+          message={makeMessage({ id: 'usr-1', role: 'user', content: 'hi' })}
+          onRewind={onRewind}
+        />
+      );
+      const buttons = screen.getAllByTitle('여기로 되돌리기');
+      expect(buttons.length).toBeGreaterThan(0);
+      fireEvent.click(buttons[0]);
+      expect(onRewind).toHaveBeenCalledWith('usr-1');
+    });
+
+    it('onRewind가 없으면 되돌리기 버튼이 렌더되지 않는다', () => {
+      render(<MessageBubble message={makeMessage({ role: 'user', content: 'hi' })} />);
+      expect(screen.queryByTitle('여기로 되돌리기')).toBeNull();
+    });
+
+    it('assistant 메시지에 onRewind와 onBranch가 함께 있으면 각각 독립 호출된다', () => {
+      const onRewind = vi.fn();
+      const onBranch = vi.fn();
+      render(
+        <MessageBubble
+          message={makeMessage({ id: 'asst-x', role: 'assistant', content: 'x' })}
+          onRewind={onRewind}
+          onBranch={onBranch}
+        />
+      );
+      fireEvent.click(screen.getAllByTitle('여기로 되돌리기')[0]);
+      fireEvent.click(screen.getAllByTitle('여기서 분기')[0]);
+      expect(onRewind).toHaveBeenCalledWith('asst-x');
+      expect(onBranch).toHaveBeenCalledWith('asst-x');
+    });
+  });
 });

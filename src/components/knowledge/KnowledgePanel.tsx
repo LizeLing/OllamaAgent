@@ -83,6 +83,27 @@ export default function KnowledgePanel({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const handleAddDirectory = async (directoryPath: string) => {
+    if (!selectedCollectionId) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/knowledge/documents/directory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collectionId: selectedCollectionId, directoryPath }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        alert(result.error || '디렉토리 추가 실패');
+      } else if (result.errors?.length) {
+        alert(`추가: ${result.added}개, 실패: ${result.failed}개\n${result.errors.join('\n')}`);
+      }
+      fetchDocuments(selectedCollectionId);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectedCollection = collections.find((c) => c.id === selectedCollectionId);
 
   return (
@@ -117,6 +138,7 @@ export default function KnowledgePanel({ onClose }: { onClose: () => void }) {
             loading={loading}
             onUpload={handleUploadDocument}
             onDelete={handleDeleteDocument}
+            onAddDirectory={handleAddDirectory}
           />
         ) : (
           <CollectionList

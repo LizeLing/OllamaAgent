@@ -13,6 +13,7 @@ interface MessageListProps {
   onRegenerate?: () => void;
   onSend?: (content: string) => void;
   onBranch?: (messageId: string) => void;
+  onRewind?: (messageId: string) => void;
 }
 
 const SUGGESTIONS = [
@@ -41,7 +42,7 @@ const SUGGESTIONS = [
 const VIRTUAL_THRESHOLD = 100;
 const RENDER_BUFFER = 20;
 
-export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend, onBranch }: MessageListProps) {
+export default function MessageList({ messages, isLoading, onEdit, onRegenerate, onSend, onBranch, onRewind }: MessageListProps) {
   const { ref } = useAutoScroll<HTMLDivElement>(messages);
   const useVirtual = messages.length >= VIRTUAL_THRESHOLD;
   const sentinelTopRef = useRef<HTMLDivElement>(null);
@@ -133,6 +134,7 @@ export default function MessageList({ messages, isLoading, onEdit, onRegenerate,
               onRegenerate={onRegenerate}
               onRetry={onRegenerate}
               onBranch={onBranch}
+              onRewind={onRewind}
               isLast={globalIdx === messages.length - 1}
             />
           );

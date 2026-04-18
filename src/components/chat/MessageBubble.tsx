@@ -81,6 +81,7 @@ interface MessageBubbleProps {
   onRegenerate?: () => void;
   onRetry?: () => void;
   onBranch?: (messageId: string) => void;
+  onRewind?: (messageId: string) => void;
   isLast?: boolean;
 }
 
@@ -96,7 +97,7 @@ function formatTime(timestamp: number): string {
   return `${dateStr} ${time}`;
 }
 
-export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRetry, onBranch, isLast }: MessageBubbleProps) {
+export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRetry, onBranch, onRewind, isLast }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const { isSpeaking, speak, stopSpeaking } = useVoice();
   const [isEditing, setIsEditing] = useState(false);
@@ -212,7 +213,7 @@ export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRe
           </div>
         )}
 
-        {/* Action buttons for user messages (edit) */}
+        {/* Action buttons for user messages (edit, rewind, branch) */}
         {isUser && !isEditing && (
           <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
             <span className="text-[10px] text-white/40">{formatTime(message.timestamp)}</span>
@@ -222,6 +223,24 @@ export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRe
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
             </button>
+            {onRewind && (
+              <button onClick={() => onRewind(message.id)} className="p-1 text-white/60 hover:text-white" title="여기로 되돌리기" aria-label="여기로 되돌리기">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="11 17 6 12 11 7" />
+                  <polyline points="18 17 13 12 18 7" />
+                </svg>
+              </button>
+            )}
+            {onBranch && (
+              <button onClick={() => onBranch(message.id)} className="p-1 text-white/60 hover:text-white" title="여기서 분기" aria-label="여기서 분기">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="6" y1="3" x2="6" y2="15" />
+                  <circle cx="18" cy="6" r="3" />
+                  <circle cx="6" cy="18" r="3" />
+                  <path d="M18 9a9 9 0 0 1-9 9" />
+                </svg>
+              </button>
+            )}
           </div>
         )}
 
@@ -260,6 +279,14 @@ export default memo(function MessageBubble({ message, onEdit, onRegenerate, onRe
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 23 10 17 10"/>
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                </svg>
+              </button>
+            )}
+            {onRewind && (
+              <button onClick={() => onRewind(message.id)} className="p-1 text-muted hover:text-foreground" title="여기로 되돌리기" aria-label="여기로 되돌리기">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="11 17 6 12 11 7" />
+                  <polyline points="18 17 13 12 18 7" />
                 </svg>
               </button>
             )}

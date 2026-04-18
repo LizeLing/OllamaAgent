@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { COMMANDS } from '@/lib/commands/definitions';
 import { Message } from '@/types/message';
+import type { TaskCommandResult } from '@/hooks/useChat';
 
 interface UseCommandsOptions {
   handleNewChat: () => void;
@@ -17,6 +18,8 @@ interface UseCommandsOptions {
   handleExport: (id: string, format: 'json' | 'markdown') => void;
   handleSend: (msg: string, imgs?: string[]) => void;
   setSelectedModel: (m: string | null) => void;
+  handleTaskCommand?: (args: string[]) => Promise<TaskCommandResult>;
+  onTaskCommandSuccess?: (result: TaskCommandResult) => void;
 }
 
 export function useCommands({
@@ -32,8 +35,27 @@ export function useCommands({
   handleExport,
   handleSend,
   setSelectedModel,
+  handleTaskCommand,
+  onTaskCommandSuccess,
 }: UseCommandsOptions) {
   const handleCommand = useCallback((name: string, args: string[]) => {
+    if (name === 'task') {
+      if (!handleTaskCommand) {
+        addSystemMessage('Task Mode를 사용할 수 없습니다.');
+        return;
+      }
+      handleTaskCommand(args)
+        .then((result) => {
+          addSystemMessage(result.message);
+          if (result.ok) {
+            onTaskCommandSuccess?.(result);
+          }
+        })
+        .catch((err) => {
+          addSystemMessage(`Task 명령 처리 실패: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      return;
+    }
     switch (name) {
       case 'new':
         handleNewChat();
@@ -127,7 +149,7 @@ export function useCommands({
         }
         break;
     }
-  }, [handleNewChat, clearMessages, addSystemMessage, selectedModel, ollamaModel, availableModels, messages, conversationId, activeId, handleExport, handleSend, setSelectedModel]);
+  }, [handleNewChat, clearMessages, addSystemMessage, selectedModel, ollamaModel, availableModels, messages, conversationId, activeId, handleExport, handleSend, setSelectedModel, handleTaskCommand, onTaskCommandSuccess]);
 
   return { handleCommand };
 }

@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { VectorEngine } from '@/lib/storage/vector-engine';
 import { getEmbedding } from '@/lib/memory/embedder';
@@ -124,6 +125,71 @@ export class KnowledgeManager {
   async listDocuments(collectionId: string): Promise<KnowledgeDocument[]> {
     const documents = await safeReadJSON<KnowledgeDocument[]>(DOCUMENTS_FILE, []);
     return documents.filter((d) => d.collectionId === collectionId);
+  }
+
+  // --- 디렉토리 일괄 추가 ---
+
+  async addDirectory(
+    collectionId: string,
+    dirPath: string
+  ): Promise<{ added: number; failed: number; errors: string[] }> {
+    const SUPPORTED_EXTS = new Set([
+      '.md', '.txt',
+      '.ts', '.tsx', '.js', '.jsx', '.py', '.java', '.go', '.rs',
+      '.c', '.cpp', '.h', '.css', '.html', '.json', '.yaml', '.yml',
+      '.docx', '.xlsx', '.pptx',
+    ]);
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+    const files = await this.scanDirectory(dirPath, SUPPORTED_EXTS);
+    let added = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const filePath of files) {
+      try {
+        const stat = await fs.stat(filePath);
+        if (stat.size > MAX_FILE_SIZE) {
+          errors.push(`${path.basename(filePath)}: 10MB 초과`);
+          failed++;
+          continue;
+        }
+        const content = await fs.readFile(filePath);
+        // 상대 경로를 파일명으로 사용하여 출처 식별 용이
+        const relativePath = path.relative(dirPath, filePath);
+        await this.addDocument(collectionId, relativePath, content);
+        added++;
+      } catch (err) {
+        errors.push(`${path.basename(filePath)}: ${err instanceof Error ? err.message : String(err)}`);
+        failed++;
+      }
+    }
+
+    return { added, failed, errors };
+  }
+
+  private async scanDirectory(dirPath: string, supportedExts: Set<string>): Promise<string[]> {
+    const results: string[] = [];
+
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+
+      // 숨김 파일/폴더, node_modules, .git 등 제외
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+      if (entry.isDirectory()) {
+        const subFiles = await this.scanDirectory(fullPath, supportedExts);
+        results.push(...subFiles);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (supportedExts.has(ext)) {
+          results.push(fullPath);
+        }
+      }
+    }
+
+    return results;
   }
 
   // --- 검색 ---

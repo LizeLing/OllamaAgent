@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { transcribeAudio } from '@/lib/voice/stt';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
+const STT_SCRIPT = path.join(process.cwd(), 'scripts', 'stt-worker.py');
+
 export async function POST(request: NextRequest) {
+  if (!existsSync(STT_SCRIPT)) {
+    return NextResponse.json(
+      { error: 'STT 서비스를 사용할 수 없습니다. stt-worker.py가 설치되지 않았습니다.' },
+      { status: 503 }
+    );
+  }
+
   try {
     const formData = await request.formData();
     const audio = formData.get('audio') as File;
@@ -20,6 +29,7 @@ export async function POST(request: NextRequest) {
     await fs.writeFile(tempPath, Buffer.from(bytes));
 
     try {
+      const { transcribeAudio } = await import('@/lib/voice/stt');
       const text = await transcribeAudio(tempPath);
       return NextResponse.json({ text });
     } finally {

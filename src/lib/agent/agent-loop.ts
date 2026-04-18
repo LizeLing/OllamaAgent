@@ -7,6 +7,20 @@ import { ToolCallTracker } from './tool-call-tracker';
 import { MiddlewareChain } from './middleware/chain';
 import { ToolMiddlewareChain } from './middleware/tool-chain';
 import { MiddlewareContext } from './middleware/types';
+import { PLAN_MODE_BLOCKED_TOOLS } from '@/types/chat';
+
+function resolveEnabledTools(config: AgentConfig): string[] | undefined {
+  if (!config.planMode) return config.enabledTools;
+
+  const blocked = new Set<string>([
+    ...PLAN_MODE_BLOCKED_TOOLS,
+    ...(config.planBlockedTools ?? []),
+  ]);
+
+  const allNames = toolRegistry.getToolNames();
+  const candidate = config.enabledTools?.length ? config.enabledTools : allNames;
+  return candidate.filter((name) => !blocked.has(name));
+}
 
 function resolveThink(
   config: AgentConfig,
@@ -68,10 +82,11 @@ export async function* runAgentLoop(
     messages = mwCtx.messages;
   }
 
-  const tools = toolRegistry.toOllamaTools(config.enabledTools);
+  const tools = toolRegistry.toOllamaTools(resolveEnabledTools(config));
   const tracker = new ToolCallTracker();
   let activeModel = config.ollamaModel;
   let fullResponse = '';
+  const blockedToolAttempts: string[] = [];
 
   for (let iteration = 0; iteration < config.maxIterations; iteration++) {
     if (abortSignal?.aborted) {
@@ -102,6 +117,22 @@ export async function* runAgentLoop(
 
     const assistantMsg = response.message;
     let toolCalls = assistantMsg.tool_calls;
+
+    // Plan 모드 방어: 차단 도구가 leak되면 제거하고 기록
+    if (config.planMode && toolCalls && toolCalls.length > 0) {
+      const blocked = new Set<string>([
+        ...PLAN_MODE_BLOCKED_TOOLS,
+        ...(config.planBlockedTools ?? []),
+      ]);
+      const leaked = toolCalls.filter((tc) => blocked.has(tc.function.name));
+      if (leaked.length > 0) {
+        for (const tc of leaked) {
+          blockedToolAttempts.push(tc.function.name);
+          yield { type: 'plan_blocked', data: { tool: tc.function.name, input: tc.function.arguments } };
+        }
+        toolCalls = toolCalls.filter((tc) => !blocked.has(tc.function.name));
+      }
+    }
 
     // 미들웨어: afterModel (toolCalls 필터링/수정)
     if (chain && toolCalls && toolCalls.length > 0) {
@@ -160,6 +191,17 @@ export async function* runAgentLoop(
         chain.runAfterAgent(mwCtx, fullResponse).catch(() => {});
       }
 
+      if (config.planMode) {
+        yield {
+          type: 'plan',
+          data: {
+            plan: fullResponse,
+            blockedTools: blockedToolAttempts,
+            model: activeModel,
+          },
+        };
+      }
+
       yield { type: 'done', data: {
         iterations: iteration + 1,
         tokenUsage: {
@@ -168,6 +210,7 @@ export async function* runAgentLoop(
           totalTokens: promptTokens + completionTokens,
         },
         model: activeModel,
+        planMode: config.planMode ?? false,
       }};
       return;
     }

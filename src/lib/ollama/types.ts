@@ -32,6 +32,7 @@ export interface OllamaChatRequest {
   model: string;
   messages: OllamaChatMessage[];
   stream?: boolean;
+  keep_alive?: string | number;
   tools?: OllamaTool[];
   options?: {
     temperature?: number;
@@ -48,6 +49,10 @@ export interface OllamaChatResponse {
   message: OllamaChatMessage;
   done: boolean;
   total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_duration?: number;
   eval_count?: number;
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Settings } from '@/types/settings';
 import GeneralTab from './tabs/GeneralTab';
 import ModelTab from './tabs/ModelTab';
@@ -27,13 +27,15 @@ const SETTING_TABS = [
 type TabId = typeof SETTING_TABS[number]['id'];
 
 export default function SettingsPanel({ onClose, settings, onSave }: SettingsPanelProps) {
-  const [draft, setDraft] = useState<Partial<Settings>>({});
+  const [draft, setDraft] = useState<Partial<Settings>>(() => (settings ? { ...settings } : {}));
+  const [syncedSettings, setSyncedSettings] = useState<Settings | null>(settings);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('general');
 
-  useEffect(() => {
-    if (settings) setDraft({ ...settings });
-  }, [settings]);
+  if (settings !== syncedSettings) {
+    setSyncedSettings(settings);
+    setDraft(settings ? { ...settings } : {});
+  }
 
   const handleDraftChange = (updates: Partial<Settings>) => {
     setDraft((prev) => ({ ...prev, ...updates }));

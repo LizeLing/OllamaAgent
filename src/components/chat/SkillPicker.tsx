@@ -13,7 +13,16 @@ interface SkillPickerProps {
 export default function SkillPicker({ visible, onSelect, onClose, filter }: SkillPickerProps) {
   const [skills, setSkills] = useState<AgentSkill[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [prevFilter, setPrevFilter] = useState(filter);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // filter가 바뀌면 선택 인덱스를 0으로 리셋 (render 중 직전 값 비교 패턴)
+  let activeIndex = selectedIndex;
+  if (prevFilter !== filter) {
+    setPrevFilter(filter);
+    setSelectedIndex(0);
+    activeIndex = 0;
+  }
 
   useEffect(() => {
     if (!visible) return;
@@ -32,17 +41,12 @@ export default function SkillPicker({ visible, onSelect, onClose, filter }: Skil
     );
   });
 
-  // Reset selection when filter changes
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [filter]);
-
   // Scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
     const items = listRef.current.querySelectorAll('[data-skill-item]');
-    items[selectedIndex]?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
+    items[activeIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -56,14 +60,14 @@ export default function SkillPicker({ visible, onSelect, onClose, filter }: Skil
         setSelectedIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        const skill = filtered[selectedIndex];
+        const skill = filtered[activeIndex];
         if (skill) onSelect(skill.id, skill.name);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
       }
     },
-    [visible, filtered, selectedIndex, onSelect, onClose]
+    [visible, filtered, activeIndex, onSelect, onClose]
   );
 
   useEffect(() => {
@@ -89,7 +93,7 @@ export default function SkillPicker({ visible, onSelect, onClose, filter }: Skil
             data-skill-item
             onClick={() => onSelect(skill.id, skill.name)}
             className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-border/50 transition-colors ${
-              idx === selectedIndex ? 'bg-border/50' : ''
+              idx === activeIndex ? 'bg-border/50' : ''
             }`}
           >
             <span className="text-base flex-shrink-0">{skill.icon || '\uD83D\uDCCB'}</span>

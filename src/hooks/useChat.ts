@@ -11,12 +11,37 @@ interface PendingApproval {
   confirmId: string;
 }
 
+export interface PendingPlan {
+  plan: string;
+  blockedTools: string[];
+  userMessage: string;
+  images?: string[];
+  model?: string;
+  format?: 'json' | Record<string, unknown>;
+}
+
+interface SendOptions {
+  planMode?: boolean;
+  approvedPlan?: string;
+}
+
+export type ChatMode = 'chat' | 'task';
+
+export interface TaskCommandResult {
+  ok: boolean;
+  message: string;
+  taskId?: string;
+}
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<PendingPlan | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [taskMode, setTaskMode] = useState<ChatMode>('chat');
   const abortRef = useRef<AbortController | null>(null);
 
   const loadConversation = useCallback(async (id: string) => {
@@ -153,6 +178,12 @@ export function useChat() {
                 knowledgeSources: data.sources as import('@/types/knowledge').SearchResultWithSource[],
               };
 
+            case 'plan':
+              return { ...m, content: (data.plan as string) ?? m.content };
+
+            case 'plan_blocked':
+              return m;
+
             case 'done': {
               const updates: Partial<Message> = {};
               if (data.tokenUsage) {
@@ -179,7 +210,7 @@ export function useChat() {
     []
   );
 
-  const sendMessage = useCallback(async (content: string, images?: string[], model?: string, format?: 'json' | Record<string, unknown>) => {
+  const sendMessage = useCallback(async (content: string, images?: string[], model?: string, format?: 'json' | Record<string, unknown>, opts?: SendOptions) => {
     setError(null);
 
     const userMessage: Message = {
@@ -207,6 +238,9 @@ export function useChat() {
     const abortController = new AbortController();
     abortRef.current = abortController;
 
+    let capturedPlan: string | null = null;
+    const capturedBlockedTools: string[] = [];
+
     try {
       const history = messages.map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -216,7 +250,17 @@ export function useChat() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, history, images, model, format }),
+        body: JSON.stringify({
+          message: content,
+          history,
+          images,
+          model,
+          format,
+          planMode: opts?.planMode ?? false,
+          approvedPlan: opts?.approvedPlan,
+          ...(taskId ? { taskId } : {}),
+          ...(taskMode === 'task' ? { taskMode } : {}),
+        }),
         signal: abortController.signal,
       });
 
@@ -249,6 +293,14 @@ export function useChat() {
             const dataStr = line.slice(6);
             try {
               const data = JSON.parse(dataStr);
+              if (eventType === 'plan' && typeof data?.plan === 'string') {
+                capturedPlan = data.plan as string;
+                if (Array.isArray(data.blockedTools)) {
+                  capturedBlockedTools.push(...(data.blockedTools as string[]));
+                }
+              } else if (eventType === 'plan_blocked' && typeof data?.tool === 'string') {
+                capturedBlockedTools.push(data.tool as string);
+              }
               handleSSEEvent(assistantId, eventType, data);
               eventType = '';
             } catch {
@@ -280,8 +332,18 @@ export function useChat() {
     } finally {
       setIsLoading(false);
       abortRef.current = null;
+      if (capturedPlan) {
+        setPendingPlan({
+          plan: capturedPlan,
+          blockedTools: Array.from(new Set(capturedBlockedTools)),
+          userMessage: content,
+          images,
+          model,
+          format,
+        });
+      }
     }
-  }, [messages, handleSSEEvent]);
+  }, [messages, handleSSEEvent, taskId, taskMode]);
 
   const editMessage = useCallback((messageId: string, newContent: string) => {
     const idx = messages.findIndex((m) => m.id === messageId);
@@ -308,6 +370,94 @@ export function useChat() {
     sendMessage(lastUserMsg.content, lastUserMsg.attachedImages);
   }, [messages, sendMessage]);
 
+  const rewindTo = useCallback(async (messageId: string): Promise<boolean> => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return false;
+
+    if (!conversationId) {
+      setMessages((prev) => prev.slice(0, idx + 1));
+      return true;
+    }
+
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/rewind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageIndex: idx }),
+      });
+      if (!res.ok) {
+        addToast('error', '대화 되돌리기에 실패했습니다.');
+        return false;
+      }
+      const data = await res.json();
+      const newMessages = data?.conversation?.messages;
+      if (Array.isArray(newMessages)) {
+        setMessages(newMessages);
+      } else {
+        setMessages((prev) => prev.slice(0, idx + 1));
+      }
+      addToast('info', '대화를 되돌렸습니다.');
+      return true;
+    } catch (err) {
+      console.error('[rewindTo]', err);
+      addToast('error', '대화 되돌리기에 실패했습니다.');
+      return false;
+    }
+  }, [messages, conversationId]);
+
+  const forkAt = useCallback(async (messageId: string): Promise<string | null> => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx === -1) return null;
+
+    if (!conversationId) {
+      addToast('warning', '저장되지 않은 대화는 분기할 수 없습니다.');
+      return null;
+    }
+
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}/fork`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageIndex: idx }),
+      });
+      if (!res.ok) {
+        addToast('error', '대화 분기에 실패했습니다.');
+        return null;
+      }
+      const data = await res.json();
+      const newId = data?.id;
+      if (typeof newId !== 'string') return null;
+      addToast('info', '새 대화로 분기되었습니다.');
+      return newId;
+    } catch (err) {
+      console.error('[forkAt]', err);
+      addToast('error', '대화 분기에 실패했습니다.');
+      return null;
+    }
+  }, [messages, conversationId]);
+
+  const approvePlan = useCallback(async () => {
+    if (!pendingPlan) return;
+    const { plan, userMessage, images, model, format } = pendingPlan;
+    setPendingPlan(null);
+    await sendMessage(userMessage, images, model, format, {
+      planMode: false,
+      approvedPlan: plan,
+    });
+  }, [pendingPlan, sendMessage]);
+
+  const requestPlanRevision = useCallback(async (feedback: string) => {
+    if (!pendingPlan) return;
+    const { userMessage, images, model, format } = pendingPlan;
+    setPendingPlan(null);
+    const revised = `${userMessage}\n\n[이전 계획에 대한 수정 요청]\n${feedback}`;
+    await sendMessage(revised, images, model, format, { planMode: true });
+  }, [pendingPlan, sendMessage]);
+
+  const cancelPlan = useCallback(() => {
+    setPendingPlan(null);
+  }, []);
+
   const respondToApproval = useCallback(async (confirmId: string, approved: boolean) => {
     try {
       await fetch('/api/chat/confirm', {
@@ -331,6 +481,8 @@ export function useChat() {
     setMessages([]);
     setConversationId(null);
     setError(null);
+    setTaskId(null);
+    setTaskMode('chat');
   }, []);
 
   const addSystemMessage = useCallback((content: string) => {
@@ -343,6 +495,126 @@ export function useChat() {
     setMessages((prev) => [...prev, msg]);
   }, []);
 
+  /**
+   * /task 명령어 처리. sub-command를 파싱해 Task Mode API와 연결한다.
+   * - new <goal>: POST /api/tasks → taskId 저장 + taskMode='task'
+   * - open <id>: 기존 Task 로드 → taskId 저장 + taskMode='task'
+   * - checkpoint: 현재 taskId로 checkpoint 생성
+   * - replan: (Main Agent 재계획 — 현재는 플레이스홀더)
+   * - done: 현재 taskId 상태를 done으로 전환 후 Chat Mode 복귀
+   */
+  const handleTaskCommand = useCallback(
+    async (rawArgs: string[]): Promise<TaskCommandResult> => {
+      const joined = (rawArgs[0] || '').trim();
+      if (!joined) {
+        return {
+          ok: false,
+          message:
+            '사용법: /task new <목표> | /task open <id> | /task checkpoint | /task replan | /task done',
+        };
+      }
+      const spaceIdx = joined.indexOf(' ');
+      const sub = spaceIdx === -1 ? joined : joined.slice(0, spaceIdx);
+      const rest = spaceIdx === -1 ? '' : joined.slice(spaceIdx + 1).trim();
+
+      try {
+        switch (sub) {
+          case 'new': {
+            if (!rest) {
+              return { ok: false, message: '사용법: /task new <목표>' };
+            }
+            const res = await fetch('/api/tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ goal: rest }),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+              return { ok: false, message: `Task 생성 실패: ${err?.error || res.status}` };
+            }
+            const record = await res.json();
+            setTaskId(record.id);
+            setTaskMode('task');
+            return {
+              ok: true,
+              taskId: record.id,
+              message: `Task "${record.title || record.id}"가 생성되었습니다. Task Mode로 전환합니다.`,
+            };
+          }
+          case 'open': {
+            if (!rest) {
+              return { ok: false, message: '사용법: /task open <id>' };
+            }
+            const res = await fetch(`/api/tasks/${encodeURIComponent(rest)}`);
+            if (!res.ok) {
+              return { ok: false, message: `Task를 찾을 수 없습니다: ${rest}` };
+            }
+            const record = await res.json();
+            setTaskId(record.id);
+            setTaskMode('task');
+            return {
+              ok: true,
+              taskId: record.id,
+              message: `Task "${record.title || record.id}"를 불러왔습니다. Task Mode로 전환합니다.`,
+            };
+          }
+          case 'checkpoint': {
+            if (!taskId) {
+              return { ok: false, message: '활성 Task가 없습니다. /task open <id> 또는 /task new <목표>로 시작하세요.' };
+            }
+            const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/checkpoint`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({}),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+              return { ok: false, message: `checkpoint 생성 실패: ${err?.error || res.status}` };
+            }
+            const cp = await res.json();
+            return { ok: true, taskId, message: `checkpoint ${cp.id}가 생성되었습니다.` };
+          }
+          case 'replan': {
+            if (!taskId) {
+              return { ok: false, message: '활성 Task가 없습니다.' };
+            }
+            return {
+              ok: true,
+              taskId,
+              message: 'replan은 현재 채팅 경로로 진행합니다. 변경이 필요한 내용을 메시지로 입력해주세요.',
+            };
+          }
+          case 'done': {
+            if (!taskId) {
+              return { ok: false, message: '활성 Task가 없습니다.' };
+            }
+            const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 'done' }),
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+              return { ok: false, message: `Task 종료 실패: ${err?.error || res.status}` };
+            }
+            const closedId = taskId;
+            setTaskId(null);
+            setTaskMode('chat');
+            return { ok: true, taskId: closedId, message: `Task ${closedId}를 완료 처리했습니다. Chat Mode로 복귀합니다.` };
+          }
+          default:
+            return { ok: false, message: `알 수 없는 subcommand: ${sub}` };
+        }
+      } catch (err) {
+        return {
+          ok: false,
+          message: `Task 명령 처리 중 오류: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    },
+    [taskId],
+  );
+
   return {
     messages,
     isLoading,
@@ -353,6 +625,8 @@ export function useChat() {
     sendMessage,
     editMessage,
     regenerate,
+    rewindTo,
+    forkAt,
     stopGeneration,
     clearMessages,
     addSystemMessage,
@@ -360,5 +634,14 @@ export function useChat() {
     saveToServer,
     pendingApproval,
     respondToApproval,
+    pendingPlan,
+    approvePlan,
+    requestPlanRevision,
+    cancelPlan,
+    taskId,
+    setTaskId,
+    taskMode,
+    setTaskMode,
+    handleTaskCommand,
   };
 }

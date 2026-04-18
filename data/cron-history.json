@@ -131,5 +131,208 @@
     "completedAt": 1772802026514,
     "success": true,
     "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":true,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773160205563,
+    "completedAt": 1773160206539,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773162005641,
+    "completedAt": 1773162006530,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773163805670,
+    "completedAt": 1773163806604,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773165605875,
+    "completedAt": 1773165606780,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773167406005,
+    "completedAt": 1773167406909,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773169205979,
+    "completedAt": 1773169207643,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773171006039,
+    "completedAt": 1773171006908,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773172806301,
+    "completedAt": 1773172807190,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773174606406,
+    "completedAt": 1773174607294,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773176400253,
+    "completedAt": 1773176401151,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773178217023,
+    "completedAt": 1773178217973,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773180013279,
+    "completedAt": 1773180014166,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773181830781,
+    "completedAt": 1773181831652,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773183648357,
+    "completedAt": 1773183649248,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773185433804,
+    "completedAt": 1773185467421,
+    "success": true,
+    "output": "Health check failed: The operation was aborted due to timeout"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773187226637,
+    "completedAt": 1773187227560,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773189003789,
+    "completedAt": 1773189004681,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773190803957,
+    "completedAt": 1773190804861,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773192604046,
+    "completedAt": 1773192604976,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773212445965,
+    "completedAt": 1773212446244,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773214246117,
+    "completedAt": 1773214247776,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773216046174,
+    "completedAt": 1773216047064,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773217846158,
+    "completedAt": 1773217847077,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773221450218,
+    "completedAt": 1773221451135,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773232222367,
+    "completedAt": 1773232223339,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773234022283,
+    "completedAt": 1773234023218,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773235820379,
+    "completedAt": 1773235821328,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773237620503,
+    "completedAt": 1773237621439,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
+  },
+  {
+    "jobId": "default-health-check",
+    "startedAt": 1773239422794,
+    "completedAt": 1773239423730,
+    "success": true,
+    "output": "Health check: OK\n{\"ollama\":true,\"searxng\":false,\"docker\":false,\"embedding\":true,\"stt\":false,\"tts\":false}"
   }
 ]

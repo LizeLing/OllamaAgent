@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { AgentMiddleware, ToolMiddleware, MiddlewareContext } from '../types';
+import type { AgentMiddleware, ToolMiddleware } from '../types';
 
 describe('Middleware Types', () => {
   it('AgentMiddleware는 name과 선택적 훅을 가진다', () => {

@@ -90,8 +90,23 @@ export async function getSkill(id: string): Promise<AgentSkill | null> {
 
   try {
     validateId(id);
-    const data = await fs.readFile(path.join(SKILLS_DIR, `${id}.json`), 'utf-8');
-    return JSON.parse(data);
+
+    // JSON 파일 기반 스킬
+    try {
+      const data = await fs.readFile(path.join(SKILLS_DIR, `${id}.json`), 'utf-8');
+      return JSON.parse(data);
+    } catch {
+      // JSON 파일이 없으면 폴더 기반 스킬 확인
+    }
+
+    // 폴더 기반 스킬 (SKILL.md)
+    const dirPath = path.join(SKILLS_DIR, id);
+    const stat = await fs.stat(dirPath);
+    if (stat.isDirectory()) {
+      return loadFolderSkill(dirPath, id);
+    }
+
+    return null;
   } catch (err) {
     logger.debug('SKILLS', `Skill not found: ${id}`, err);
     return null;
@@ -110,8 +125,24 @@ export async function deleteSkill(id: string): Promise<boolean> {
   }
   try {
     validateId(id);
-    await fs.unlink(path.join(SKILLS_DIR, `${id}.json`));
-    return true;
+
+    // JSON 파일 기반 스킬
+    try {
+      await fs.unlink(path.join(SKILLS_DIR, `${id}.json`));
+      return true;
+    } catch {
+      // JSON 파일이 없으면 폴더 기반 스킬 확인
+    }
+
+    // 폴더 기반 스킬
+    const dirPath = path.join(SKILLS_DIR, id);
+    const stat = await fs.stat(dirPath);
+    if (stat.isDirectory()) {
+      await fs.rm(dirPath, { recursive: true });
+      return true;
+    }
+
+    return false;
   } catch (err) {
     logger.warn('SKILLS', `Failed to delete skill: ${id}`, err);
     return false;

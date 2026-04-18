@@ -40,4 +40,10 @@ export const COMMANDS: CommandDefinition[] = [
     args: [{ name: 'name', description: '스킬 트리거 커맨드', required: false }],
     type: 'client',
   },
+  {
+    name: 'task',
+    description: 'Task Mode 제어 (new/open/checkpoint/replan/done)',
+    args: [{ name: 'subcommand', description: 'new <목표> | open <id> | checkpoint | replan | done', required: false }],
+    type: 'client',
+  },
 ];

@@ -39,4 +39,5 @@ export const DEFAULT_SETTINGS: Settings = {
     preference: { weight: 1.5, maxAgeDays: 90 },
     general: { weight: 0.8, maxAgeDays: 14 },
   },
+  defaultPlanMode: false,
 };
